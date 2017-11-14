@@ -8,9 +8,7 @@
 #include <stdlib.h>
 #include <stdarg.h>
 #include <stdint.h>
-#include <assert.h>
-#include <algorithm>
-#include "./pnglite.h"
+#include "pnglite.h"
 
 
 extern const char *__progname;
