@@ -17,7 +17,10 @@ Run:
 
 ## Usage
 
-    $ dist/cudatransform <swap|gray|blur|emboss> <infile> <outfile>
+    $ dist/cudatransform <swap|gray|blur|emboss> <infile> <outfile> (<area>)
+
+* &lt;area&gt; is only used for blur mode.
+
 
 
 ### Examples

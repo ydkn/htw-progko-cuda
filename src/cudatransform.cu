@@ -34,12 +34,27 @@ struct Image {
 // Encode a 32-bit unsigned RGBA value from individual red, green, blue, and alpha component values.
 #define RGBA(r,g,b,a) ((((a) << 24)) | (((b) << 16)) | (((g) << 8)) | ((r)))
 
+// Length of an array
+#define ARRAY_LENGTH(a) ((sizeof(a) > 0) ? sizeof(a) / sizeof(a[0]) : 0)
+
+// Check if CUDA function was executed successfully
+#define CUDA_CHECK(call) {                                                                                \
+  const cudaError_t e = call;                                                                             \
+  if (e != cudaSuccess) {                                                                                 \
+    printf("\nCUDA error: %s:%d, code: %d, reason: %s\n", __FILE__, __LINE__, e, cudaGetErrorString(e));  \
+    exit(2);                                                                                              \
+  }                                                                                                       \
+}
+
 
 #pragma mark CUDA Kernels
 
 // Swap green and blue
 __global__ void kernel_swap_green_blue(uint32_t *in, uint32_t *out, int w, int h){
   int idx = blockIdx.y * w + blockIdx.x;
+
+  // Check if thread index is no longer within input array
+  if (ARRAY_LENGTH(in) >= idx) { return; }
 
   out[idx] = RGBA(RED(in[idx]), BLUE(in[idx]), GREEN(in[idx]), ALPHA(in[idx]));
 }
@@ -48,18 +63,45 @@ __global__ void kernel_swap_green_blue(uint32_t *in, uint32_t *out, int w, int h
 __global__ void kernel_gray(uint32_t *in, uint32_t *out, int w, int h){
   int idx = blockIdx.y * w + blockIdx.x;
 
+  // Check if thread index is no longer within input array
+  if (ARRAY_LENGTH(in) >= idx) { return; }
+
   uint8_t gray = (0.21 * RED(in[idx])) + (0.72 * GREEN(in[idx])) + (0.07 * BLUE(in[idx]));
 
   out[idx] = RGBA(gray, gray, gray, ALPHA(in[idx]));
 }
 
 // Blur image
-__global__ void kernel_blur(uint32_t *in, uint32_t *out, int w, int h) {
+__global__ void kernel_blur(uint32_t *in, uint32_t *out, int w, int h, int area) {
   int idx = blockIdx.y * w + blockIdx.x;
 
-  // TODO implement
+  // Check if thread index is no longer within input array
+  if (ARRAY_LENGTH(in) >= idx) { return; }
 
-  out[idx] = RGBA(RED(in[idx]), GREEN(in[idx]), BLUE(in[idx]), ALPHA(in[idx]));
+  uint32_t min_x      = blockIdx.x < area ? 0 : blockIdx.x - area;
+  uint32_t min_y      = blockIdx.y < area ? 0 : blockIdx.y - area;
+  uint32_t max_x      = (blockIdx.x + area) >= w ? w : blockIdx.x + area;
+  uint32_t max_y      = (blockIdx.y + area) >= h ? h : blockIdx.y + area;
+  uint32_t num_pixels = 0;
+  uint32_t red_sum    = 0;
+  uint32_t green_sum  = 0;
+  uint32_t blue_sum   = 0;
+  uint32_t alpha_sum  = 0;
+  int      i          = 0;
+
+  for(int x = min_x; x < max_x; x += 1) {
+    for(int y = min_y; y < max_y; y += 1) {
+      i = y * w + x;
+
+      num_pixels += 1;
+      red_sum    += RED(in[i]);
+      green_sum  += GREEN(in[i]);
+      blue_sum   += BLUE(in[i]);
+      alpha_sum  += ALPHA(in[i]);
+    }
+  }
+
+  out[idx] = RGBA((red_sum / num_pixels), (green_sum / num_pixels), (blue_sum / num_pixels), (alpha_sum / num_pixels));
 }
 
 // Transform image with emboss
@@ -68,6 +110,10 @@ __global__ void kernel_emboss(uint32_t *in, uint32_t *out, int w, int h) {
 
   int idx     = blockIdx.y * w + blockIdx.x;
   int idx_ref = (blockIdx.y - 1) * w + (blockIdx.x - 1);
+
+  // Check if thread index is no longer within input array
+  if (ARRAY_LENGTH(in) >= idx) { return; }
+  if (ARRAY_LENGTH(in) >= idx_ref) { return; }
 
   int diffs[] = {
     (RED(in[idx_ref]) - RED(in[idx])),
@@ -153,7 +199,8 @@ static void save_image(const char *filename, uint32_t *img_data, const Image *or
 // Output CUDA information
 static void showCudaInfo() {
   cudaDeviceProp prop;
-  cudaGetDeviceProperties(&prop, 0);
+  CUDA_CHECK(cudaGetDeviceProperties(&prop, 0));
+
   printf("CUDA INFORMATION\n================\n");
   printf("Name: %s\n", prop.name);
   printf("Total Memory: %u Bytes\n", prop.totalGlobalMem);
@@ -175,8 +222,8 @@ static void showImageInfo(const Image *img) {
 #pragma mark main
 
 int main(int argc, char **argv) {
-  if (argc != 4) {
-    terminate("Usage: %s <swap|gray|blur|emboss> <infile> <outfile>\n", __progname);
+  if (argc < 4) {
+    terminate("Usage: %s <swap|gray|blur|emboss> <infile> <outfile> (<area>)\n", __progname);
   }
 
   // Load image
@@ -195,11 +242,11 @@ int main(int argc, char **argv) {
   // Initialize/allocate buffers
   size_t buffer_size = img->number_of_pixels * sizeof(uint32_t);
   uint32_t *dev_imgdata, *dev_imgdata_out;
-  cudaMalloc((void **) &dev_imgdata, buffer_size);
-  cudaMalloc((void **) &dev_imgdata_out, buffer_size);
+  CUDA_CHECK(cudaMalloc((void **) &dev_imgdata, buffer_size));
+  CUDA_CHECK(cudaMalloc((void **) &dev_imgdata_out, buffer_size));
 
   // Copy image data to device
-  cudaMemcpy(dev_imgdata, img_data, buffer_size, cudaMemcpyHostToDevice);
+  CUDA_CHECK(cudaMemcpy(dev_imgdata, img_data, buffer_size, cudaMemcpyHostToDevice));
   dim3 grid(img->width, img->height);
 
   // Switch transformation type
@@ -208,7 +255,11 @@ int main(int argc, char **argv) {
   } else if (strcmp(argv[1], "gray") == 0) {
     kernel_gray<<<grid, 1>>>(dev_imgdata, dev_imgdata_out, img->width, img->height);
   } else if (strcmp(argv[1], "blur") == 0) {
-    kernel_blur<<<grid, 1>>>(dev_imgdata, dev_imgdata_out, img->width, img->height);
+    int area = 11;
+
+    if (argc == 5) { area = atoi(argv[4]); }
+
+    kernel_blur<<<grid, 1>>>(dev_imgdata, dev_imgdata_out, img->width, img->height, area);
   } else if (strcmp(argv[1], "emboss") == 0) {
     kernel_emboss<<<grid, 1>>>(dev_imgdata, dev_imgdata_out, img->width, img->height);
   } else {
@@ -216,7 +267,12 @@ int main(int argc, char **argv) {
   }
 
   // Copy transformed image data from device
-  cudaMemcpy(out_img_data, dev_imgdata_out, buffer_size, cudaMemcpyDeviceToHost);
+  CUDA_CHECK(cudaMemcpy(out_img_data, dev_imgdata_out, buffer_size, cudaMemcpyDeviceToHost));
+  CUDA_CHECK(cudaFree(dev_imgdata));
+  CUDA_CHECK(cudaFree(dev_imgdata_out));
+
+  // Terminate CUDA device usage
+  CUDA_CHECK(cudaDeviceReset());
 
   // Save image to disk and close file handle
   save_image(argv[3], out_img_data, img);
