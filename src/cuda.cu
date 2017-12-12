@@ -1,7 +1,146 @@
 /*
-  cudatransform.cu - Image manipulations using CUDA
+  cuda.cu - Image manipulations using CUDA
   Copyright (c) 2017 Elsa Buchholz, Florian Schwab
 */
+
+#include <stdlib.h>
+#include <opencv2/opencv.hpp>
+#include "common.h"
+
+
+#pragma mark Transformation Types
+
+int const CUDA_SWAP   = 0;
+int const CUDA_GRAY   = 1;
+int const CUDA_BLUR   = 2;
+int const CUDA_EMBOSS = 3;
+
+
+#pragma mark Macros
+
+// Length of an array
+#define ARRAY_LENGTH(a) ((sizeof(a) > 0) ? sizeof(a) / sizeof(a[0]) : 0)
+
+// Check if CUDA function was executed successfully
+#define CUDA_CHECK(call) {                                                                                \
+  const cudaError_t e = call;                                                                             \
+  if (e != cudaSuccess) {                                                                                 \
+    printf("\nCUDA error: %s:%d, code: %d, reason: %s\n", __FILE__, __LINE__, e, cudaGetErrorString(e));  \
+    exit(2);                                                                                              \
+  }                                                                                                       \
+}
+
+
+#pragma mark CUDA wrapper
+
+// Output CUDA information
+static void showCudaInfo() {
+  cudaDeviceProp prop;
+  CUDA_CHECK(cudaGetDeviceProperties(&prop, 0));
+
+  printf("CUDA INFORMATION\n================\n");
+  printf("Name: %s\n", prop.name);
+  printf("Total Memory: %u Bytes\n", prop.totalGlobalMem);
+  printf("Max. Threads Per Block: %d\n", prop.maxThreadsPerBlock);
+  printf("Clock Rate: %d kHz\n", prop.clockRate);
+  printf("Multiprocessors: %d\n", prop.multiProcessorCount);
+  printf("Concurrent Kernels: %d\n", prop.concurrentKernels);
+
+  free(prop);
+}
+
+// Wrapper for all CUDA kernels
+int cuda(int type, cv::Mat image, uint32_t width, uint32_t height, uint8_t data[][4], uint8_t area) {
+  uint8_t (*img)[4] = (uint8_t (*)[4]) data;
+
+  // Show CUDA infos
+  showCudaInfo();
+
+  size_t buffer_size = width * height * sizeof(uint8_t) * 4;
+  uint32_t *dev_in, *dev_out;
+
+  // Allocate memory on device
+  CUDA_CHECK(cudaMalloc((void **) &dev_in, buffer_size));
+  CUDA_CHECK(cudaMalloc((void **) &dev_out, buffer_size));
+
+  // Copy image data to device
+  CUDA_CHECK(cudaMemcpy(dev_in, img, buffer_size, cudaMemcpyHostToDevice));
+
+  dim3 grid(width, height);
+
+  switch(type) {
+    case CUDA_SWAP:
+      kernel_swap<<<grid, 1>>>(dev_in, dev_out, width, height);
+      break;
+
+    case CUDA_GRAY:
+      kernel_gray<<<grid, 1>>>(dev_in, dev_out, width, height);
+      break;
+
+    case CUDA_BLUR:
+      kernel_blur<<<grid, 1>>>(dev_in, dev_out, width, height, area);
+      break;
+
+    case CUDA_EMBOSS:
+      kernel_emboss<<<grid, 1>>>(dev_in, dev_out, width, height);
+      break;
+  }
+
+  // Copy transformed image data from device
+  CUDA_CHECK(cudaMemcpy(img, dev_out, buffer_size, cudaMemcpyDeviceToHost));
+  CUDA_CHECK(cudaFree(dev_in));
+  CUDA_CHECK(cudaFree(dev_out));
+
+  // Terminate CUDA device usage
+  CUDA_CHECK(cudaDeviceReset());
+}
+
+
+#pragma mark Swap Green/Blue
+
+int swap(cv::Mat image, uint32_t width, uint32_t height, uint8_t data[][4]) {
+  cuda(image, width, height, data, 0);
+
+  return RES_ARRAY;
+}
+
+__device__ void kernel_swap_green_blue(uint32_t *in, uint32_t *out, int w, int h) {
+  int idx = blockIdx.y * w + blockIdx.x;
+
+  // Check if thread index is no longer within input array
+  if (ARRAY_LENGTH(in) >= idx) { return; }
+
+  out[idx][RED_IDX]   = in[idx][RED_IDX];
+  out[idx][GREEN_IDX] = in[idx][BLUE_IDX];
+  out[idx][BLUE_IDX]  = in[idx][GREEN_IDX];
+  out[idx][ALPHA_IDX] = in[idx][ALPHA_IDX];
+}
+
+
+#pragma mark Grayscale
+
+int gray(cv::Mat image, uint32_t width, uint32_t height, uint8_t data[][4]) {
+  return RES_ARRAY;
+}
+
+
+#pragma mark Blur
+
+int blur(cv::Mat image, uint32_t width, uint32_t height, uint8_t data[][4], uint8_t area) {
+  return RES_ARRAY;
+}
+
+
+#pragma mark Emboss
+
+int emboss(cv::Mat image, uint32_t width, uint32_t height, uint8_t data[][4]) {
+  return RES_ARRAY;
+}
+
+
+
+/*
+
 
 
 #include <stdio.h>
@@ -287,3 +426,4 @@ int main(int argc, char **argv) {
 
   return 0;
 }
+*/
