@@ -3,6 +3,7 @@
   Copyright (c) 2017 Elsa Buchholz, Florian Schwab
 */
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <opencv2/opencv.hpp>
 #include "common.h"
@@ -31,165 +32,9 @@ int const CUDA_EMBOSS = 3;
 }
 
 
-#pragma mark CUDA wrapper
+#pragma mark Kernels
 
-// Output CUDA information
-static void showCudaInfo() {
-  cudaDeviceProp prop;
-  CUDA_CHECK(cudaGetDeviceProperties(&prop, 0));
-
-  printf("CUDA INFORMATION\n================\n");
-  printf("Name: %s\n", prop.name);
-  printf("Total Memory: %u Bytes\n", prop.totalGlobalMem);
-  printf("Max. Threads Per Block: %d\n", prop.maxThreadsPerBlock);
-  printf("Clock Rate: %d kHz\n", prop.clockRate);
-  printf("Multiprocessors: %d\n", prop.multiProcessorCount);
-  printf("Concurrent Kernels: %d\n", prop.concurrentKernels);
-
-  free(prop);
-}
-
-// Wrapper for all CUDA kernels
-int cuda(int type, cv::Mat image, uint32_t width, uint32_t height, uint8_t data[][4], uint8_t area) {
-  uint8_t (*img)[4] = (uint8_t (*)[4]) data;
-
-  // Show CUDA infos
-  showCudaInfo();
-
-  size_t buffer_size = width * height * sizeof(uint8_t) * 4;
-  uint32_t *dev_in, *dev_out;
-
-  // Allocate memory on device
-  CUDA_CHECK(cudaMalloc((void **) &dev_in, buffer_size));
-  CUDA_CHECK(cudaMalloc((void **) &dev_out, buffer_size));
-
-  // Copy image data to device
-  CUDA_CHECK(cudaMemcpy(dev_in, img, buffer_size, cudaMemcpyHostToDevice));
-
-  dim3 grid(width, height);
-
-  switch(type) {
-    case CUDA_SWAP:
-      kernel_swap<<<grid, 1>>>(dev_in, dev_out, width, height);
-      break;
-
-    case CUDA_GRAY:
-      kernel_gray<<<grid, 1>>>(dev_in, dev_out, width, height);
-      break;
-
-    case CUDA_BLUR:
-      kernel_blur<<<grid, 1>>>(dev_in, dev_out, width, height, area);
-      break;
-
-    case CUDA_EMBOSS:
-      kernel_emboss<<<grid, 1>>>(dev_in, dev_out, width, height);
-      break;
-  }
-
-  // Copy transformed image data from device
-  CUDA_CHECK(cudaMemcpy(img, dev_out, buffer_size, cudaMemcpyDeviceToHost));
-  CUDA_CHECK(cudaFree(dev_in));
-  CUDA_CHECK(cudaFree(dev_out));
-
-  // Terminate CUDA device usage
-  CUDA_CHECK(cudaDeviceReset());
-}
-
-
-#pragma mark Swap Green/Blue
-
-int swap(cv::Mat image, uint32_t width, uint32_t height, uint8_t data[][4]) {
-  cuda(image, width, height, data, 0);
-
-  return RES_ARRAY;
-}
-
-__device__ void kernel_swap_green_blue(uint32_t *in, uint32_t *out, int w, int h) {
-  int idx = blockIdx.y * w + blockIdx.x;
-
-  // Check if thread index is no longer within input array
-  if (ARRAY_LENGTH(in) >= idx) { return; }
-
-  out[idx][RED_IDX]   = in[idx][RED_IDX];
-  out[idx][GREEN_IDX] = in[idx][BLUE_IDX];
-  out[idx][BLUE_IDX]  = in[idx][GREEN_IDX];
-  out[idx][ALPHA_IDX] = in[idx][ALPHA_IDX];
-}
-
-
-#pragma mark Grayscale
-
-int gray(cv::Mat image, uint32_t width, uint32_t height, uint8_t data[][4]) {
-  return RES_ARRAY;
-}
-
-
-#pragma mark Blur
-
-int blur(cv::Mat image, uint32_t width, uint32_t height, uint8_t data[][4], uint8_t area) {
-  return RES_ARRAY;
-}
-
-
-#pragma mark Emboss
-
-int emboss(cv::Mat image, uint32_t width, uint32_t height, uint8_t data[][4]) {
-  return RES_ARRAY;
-}
-
-
-
-/*
-
-
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <stdarg.h>
-#include <stdint.h>
-#include "pnglite.h"
-
-
-extern const char *__progname;
-
-
-#pragma mark Image Helper Stuff
-
-// Representation image
-struct Image {
-  png_t    png;
-  uint32_t *pixels;
-  size_t   number_of_pixels;
-  uint     width;
-  uint     height;
-};
-
-// Access red, green, blue, and alpha component values in a 32-bit unsigned RGBA pixel value.
-#define ALPHA(pixel) ((pixel)>>24)
-#define BLUE(pixel)  (((pixel)>>16)&0xFF)
-#define GREEN(pixel) (((pixel)>>8)&0xFF)
-#define RED(pixel)   ((pixel)&0xFF)
-
-// Encode a 32-bit unsigned RGBA value from individual red, green, blue, and alpha component values.
-#define RGBA(r,g,b,a) ((((a) << 24)) | (((b) << 16)) | (((g) << 8)) | ((r)))
-
-// Length of an array
-#define ARRAY_LENGTH(a) ((sizeof(a) > 0) ? sizeof(a) / sizeof(a[0]) : 0)
-
-// Check if CUDA function was executed successfully
-#define CUDA_CHECK(call) {                                                                                \
-  const cudaError_t e = call;                                                                             \
-  if (e != cudaSuccess) {                                                                                 \
-    printf("\nCUDA error: %s:%d, code: %d, reason: %s\n", __FILE__, __LINE__, e, cudaGetErrorString(e));  \
-    exit(2);                                                                                              \
-  }                                                                                                       \
-}
-
-
-#pragma mark CUDA Kernels
-
-// Swap green and blue
-__global__ void kernel_swap_green_blue(uint32_t *in, uint32_t *out, int w, int h){
+__global__ void kernel_swap(uint32_t *in, uint32_t *out, uint32_t w, uint32_t h) {
   int idx = blockIdx.y * w + blockIdx.x;
 
   // Check if thread index is no longer within input array
@@ -198,8 +43,7 @@ __global__ void kernel_swap_green_blue(uint32_t *in, uint32_t *out, int w, int h
   out[idx] = RGBA(RED(in[idx]), BLUE(in[idx]), GREEN(in[idx]), ALPHA(in[idx]));
 }
 
-// Transform image into gray scale
-__global__ void kernel_gray(uint32_t *in, uint32_t *out, int w, int h){
+__global__ void kernel_gray(uint32_t *in, uint32_t *out, uint32_t w, uint32_t h) {
   int idx = blockIdx.y * w + blockIdx.x;
 
   // Check if thread index is no longer within input array
@@ -210,8 +54,7 @@ __global__ void kernel_gray(uint32_t *in, uint32_t *out, int w, int h){
   out[idx] = RGBA(gray, gray, gray, ALPHA(in[idx]));
 }
 
-// Blur image
-__global__ void kernel_blur(uint32_t *in, uint32_t *out, int w, int h, int area) {
+__global__ void kernel_blur(uint32_t *in, uint32_t *out, uint32_t w, uint32_t h, uint8_t area) {
   int idx = blockIdx.y * w + blockIdx.x;
 
   // Check if thread index is no longer within input array
@@ -226,7 +69,7 @@ __global__ void kernel_blur(uint32_t *in, uint32_t *out, int w, int h, int area)
   uint32_t green_sum  = 0;
   uint32_t blue_sum   = 0;
   uint32_t alpha_sum  = 0;
-  int      i          = 0;
+  uint32_t i          = 0;
 
   for(int x = min_x; x < max_x; x += 1) {
     for(int y = min_y; y < max_y; y += 1) {
@@ -243,8 +86,7 @@ __global__ void kernel_blur(uint32_t *in, uint32_t *out, int w, int h, int area)
   out[idx] = RGBA((red_sum / num_pixels), (green_sum / num_pixels), (blue_sum / num_pixels), (alpha_sum / num_pixels));
 }
 
-// Transform image with emboss
-__global__ void kernel_emboss(uint32_t *in, uint32_t *out, int w, int h) {
+__global__ void kernel_emboss(uint32_t *in, uint32_t *out, uint32_t w, uint32_t h) {
   if (blockIdx.y < 1 || blockIdx.x < 1) { return; }
 
   int idx     = blockIdx.y * w + blockIdx.x;
@@ -272,68 +114,7 @@ __global__ void kernel_emboss(uint32_t *in, uint32_t *out, int w, int h) {
 }
 
 
-#pragma mark Helper Methods
-
-// Terminate program with message
-void terminate(const char *fmt, ...) {
-  va_list args;
-
-  va_start(args, fmt);
-  vfprintf(stderr, fmt, args);
-  va_end(args);
-
-  exit(1);
-}
-
-// Allocate a buffer large enough to store pixel data for given image.
-uint32_t *alloc_image_buffer(Image *img) {
-  return (uint32_t *) malloc(img->number_of_pixels * sizeof(uint32_t));
-}
-
-// Read an image from a file
-static Image *read_image(const char *filename) {
-  Image *img = (Image *) malloc(sizeof(Image));
-
-  if (png_open_file_read(&img->png, filename) != PNG_NO_ERROR) {
-    terminate("Couldn't open image\n");
-  }
-
-  // Number of pixels
-  img->width            = img->png.width;
-  img->height           = img->png.height;
-  img->number_of_pixels = img->png.width * img->png.height;
-
-  if (img->png.color_type != PNG_TRUECOLOR_ALPHA) {
-    terminate("Only true color alpha images supported\n");
-  }
-
-  img->pixels = alloc_image_buffer(img);
-
-  if (png_get_data(&img->png, (unsigned char *) img->pixels) != PNG_NO_ERROR) {
-    terminate("Could not read image data\n");
-  }
-
-  return img;
-}
-
-// Save a transformed image.
-static void save_image(const char *filename, uint32_t *img_data, const Image *orig_img) {
-  png_t out;
-
-  if (png_open_file_write(&out, filename) != PNG_NO_ERROR) {
-    terminate("couldn't open image to save\n");
-  }
-
-  if (png_set_data(&out, orig_img->png.width, orig_img->png.height, orig_img->png.depth,
-                   orig_img->png.color_type, (unsigned char *)img_data) != PNG_NO_ERROR) {
-    terminate("Could not save image data\n");
-  }
-
-  png_close_file(&out);
-}
-
-
-#pragma mark Info Outputs
+#pragma mark CUDA wrapper
 
 // Output CUDA information
 static void showCudaInfo() {
@@ -349,81 +130,73 @@ static void showCudaInfo() {
   printf("Concurrent Kernels: %d\n", prop.concurrentKernels);
 }
 
-// Output image information
-static void showImageInfo(const Image *img) {
-  printf("\nIMAGE INFORMATION\n================\n");
-  printf("Width: %u\n", img->width);
-  printf("Height: %u\n", img->height);
-  printf("Total Pixels: %u\n", img->number_of_pixels);
-}
-
-
-#pragma mark main
-
-int main(int argc, char **argv) {
-  if (argc < 4) {
-    terminate("Usage: %s <swap|gray|blur|emboss> <infile> <outfile> (<area>)\n", __progname);
-  }
-
-  // Load image
-  png_init(0, 0);
-
-  Image    *img          = read_image(argv[2]);
-  uint32_t *img_data     = img->pixels;
-  uint32_t *out_img_data = (uint32_t *) alloc_image_buffer(img);
-
+// Wrapper for all CUDA kernels
+void cuda(int type, uint32_t width, uint32_t height, uint32_t *data, uint8_t area) {
   // Show CUDA infos
   showCudaInfo();
 
-  // Show image infos
-  showImageInfo(img);
+  size_t buffer_size = width * height * sizeof(uint32_t);
+  uint32_t *dev_in, *dev_out;
 
-  // Initialize/allocate buffers
-  size_t buffer_size = img->number_of_pixels * sizeof(uint32_t);
-  uint32_t *dev_imgdata, *dev_imgdata_out;
-  CUDA_CHECK(cudaMalloc((void **) &dev_imgdata, buffer_size));
-  CUDA_CHECK(cudaMalloc((void **) &dev_imgdata_out, buffer_size));
+  // Allocate memory on device
+  CUDA_CHECK(cudaMalloc((void **) &dev_in, buffer_size));
+  CUDA_CHECK(cudaMalloc((void **) &dev_out, buffer_size));
 
   // Copy image data to device
-  CUDA_CHECK(cudaMemcpy(dev_imgdata, img_data, buffer_size, cudaMemcpyHostToDevice));
-  dim3 grid(img->width, img->height);
+  CUDA_CHECK(cudaMemcpy(dev_in, data, buffer_size, cudaMemcpyHostToDevice));
 
-  // Switch transformation type
-  if (strcmp(argv[1], "swap") == 0) {
-    kernel_swap_green_blue<<<grid, 1>>>(dev_imgdata, dev_imgdata_out, img->width, img->height);
-  } else if (strcmp(argv[1], "gray") == 0) {
-    kernel_gray<<<grid, 1>>>(dev_imgdata, dev_imgdata_out, img->width, img->height);
-  } else if (strcmp(argv[1], "blur") == 0) {
-    int area = 11;
+  dim3 grid(width, height);
 
-    if (argc == 5) { area = atoi(argv[4]); }
+  switch(type) {
+    case CUDA_SWAP:
+      kernel_swap<<<grid, 1>>>(dev_in, dev_out, width, height);
+      break;
 
-    kernel_blur<<<grid, 1>>>(dev_imgdata, dev_imgdata_out, img->width, img->height, area);
-  } else if (strcmp(argv[1], "emboss") == 0) {
-    kernel_emboss<<<grid, 1>>>(dev_imgdata, dev_imgdata_out, img->width, img->height);
-  } else {
-    terminate("\nUnsupported Transformation: %s\n", argv[1]);
+    case CUDA_GRAY:
+      kernel_gray<<<grid, 1>>>(dev_in, dev_out, width, height);
+      break;
+
+    case CUDA_BLUR:
+      kernel_blur<<<grid, 1>>>(dev_in, dev_out, width, height, area);
+      break;
+
+    case CUDA_EMBOSS:
+      kernel_emboss<<<grid, 1>>>(dev_in, dev_out, width, height);
+      break;
   }
 
   // Copy transformed image data from device
-  CUDA_CHECK(cudaMemcpy(out_img_data, dev_imgdata_out, buffer_size, cudaMemcpyDeviceToHost));
-  CUDA_CHECK(cudaFree(dev_imgdata));
-  CUDA_CHECK(cudaFree(dev_imgdata_out));
+  CUDA_CHECK(cudaMemcpy(data, dev_out, buffer_size, cudaMemcpyDeviceToHost));
+  CUDA_CHECK(cudaFree(dev_in));
+  CUDA_CHECK(cudaFree(dev_out));
 
   // Terminate CUDA device usage
   CUDA_CHECK(cudaDeviceReset());
-
-  // Save image to disk and close file handle
-  save_image(argv[3], out_img_data, img);
-  png_close_file(&img->png);
-
-  printf("\nSaved Transformed Image: %s\n", argv[3]);
-
-  // Cleanup memory
-  free(img->pixels);
-  free(img);
-  free(out_img_data);
-
-  return 0;
 }
-*/
+
+
+#pragma mark Transformations
+
+int swap(cv::Mat image, uint32_t width, uint32_t height, uint32_t *data) {
+  cuda(CUDA_SWAP, width, height, data, 0);
+
+  return RES_ARRAY;
+}
+
+int gray(cv::Mat image, uint32_t width, uint32_t height, uint32_t *data) {
+  cuda(CUDA_GRAY, width, height, data, 0);
+
+  return RES_ARRAY;
+}
+
+int blur(cv::Mat image, uint32_t width, uint32_t height, uint32_t *data, uint8_t area) {
+  cuda(CUDA_BLUR, width, height, data, area);
+
+  return RES_ARRAY;
+}
+
+int emboss(cv::Mat image, uint32_t width, uint32_t height, uint32_t *data) {
+  cuda(CUDA_EMBOSS, width, height, data, 0);
+
+  return RES_ARRAY;
+}

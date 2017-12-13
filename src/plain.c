@@ -10,18 +10,12 @@
 
 #pragma mark Swap Green/Blue
 
-int swap(cv::Mat image, uint32_t width, uint32_t height, uint8_t data[][4]) {
-  uint8_t (*img)[4] = (uint8_t (*)[4]) data;
-
+int swap(cv::Mat image, uint32_t width, uint32_t height, uint32_t *data) {
   for (int i = 0; i < height; i++) {
     for (int j = 0; j < width; j++) {
       int index = (i * width) + j;
 
-      uint8_t green = img[index][GREEN_IDX];
-      uint8_t blue  = img[index][BLUE_IDX];
-
-      img[index][GREEN_IDX] = blue;
-      img[index][BLUE_IDX]  = green;
+      data[index] = RGBA(RED(data[index]), BLUE(data[index]), GREEN(data[index]), ALPHA(data[index]));
     }
   }
 
@@ -31,20 +25,20 @@ int swap(cv::Mat image, uint32_t width, uint32_t height, uint8_t data[][4]) {
 
 #pragma mark Grayscale
 
-int gray(cv::Mat image, uint32_t width, uint32_t height, uint8_t data[][4]) {
+int gray(cv::Mat image, uint32_t width, uint32_t height, uint32_t *data) {
   return RES_ARRAY;
 }
 
 
 #pragma mark Blur
 
-int blur(cv::Mat image, uint32_t width, uint32_t height, uint8_t data[][4], uint8_t area) {
+int blur(cv::Mat image, uint32_t width, uint32_t height, uint32_t *data, uint8_t area) {
   return RES_ARRAY;
 }
 
 
 #pragma mark Emboss
 
-int emboss(cv::Mat image, uint32_t width, uint32_t height, uint8_t data[][4]) {
+int emboss(cv::Mat image, uint32_t width, uint32_t height, uint32_t *data) {
   return RES_ARRAY;
 }

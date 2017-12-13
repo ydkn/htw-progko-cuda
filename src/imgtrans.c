@@ -28,10 +28,10 @@ void term_msg(const char *fmt, ...) {
 
 #pragma mark transformations
 
-extern int swap(cv::Mat image, uint32_t width, uint32_t height, uint8_t data[][4]);
-extern int gray(cv::Mat image, uint32_t width, uint32_t height, uint8_t data[][4]);
-extern int blur(cv::Mat image, uint32_t width, uint32_t height, uint8_t data[][4], uint8_t area);
-extern int emboss(cv::Mat image, uint32_t width, uint32_t height, uint8_t data[][4]);
+extern int swap(cv::Mat image, uint32_t width, uint32_t height, uint32_t *data);
+extern int gray(cv::Mat image, uint32_t width, uint32_t height, uint32_t *data);
+extern int blur(cv::Mat image, uint32_t width, uint32_t height, uint32_t *data, uint8_t area);
+extern int emboss(cv::Mat image, uint32_t width, uint32_t height, uint32_t *data);
 
 
 #pragma mark main
@@ -52,17 +52,14 @@ int main(int argc, char **argv) {
   }
 
   // convert image/matrix to a plain 2-dim array to allow passing same input to all functions
-  uint8_t image[raw_image.rows * raw_image.cols][4];
+  uint32_t *image = (uint32_t *) malloc((raw_image.rows * raw_image.cols) * sizeof(uint32_t));
 
   for (int i = 0; i < raw_image.rows; i++) {
     for (int j = 0; j < raw_image.cols; j++) {
       int raw_index = (i * raw_image.cols + j) * 4;
       int index     = (i * raw_image.cols) + j;
 
-      image[index][RED_IDX]   = raw_image.data[raw_index + 0];
-      image[index][GREEN_IDX] = raw_image.data[raw_index + 1];
-      image[index][BLUE_IDX]  = raw_image.data[raw_index + 2];
-      image[index][ALPHA_IDX] = raw_image.data[raw_index + 3];
+      image[index] = RGBA(raw_image.data[raw_index + 0], raw_image.data[raw_index + 1], raw_image.data[raw_index + 2], raw_image.data[raw_index + 3]);
     }
   }
 
@@ -85,9 +82,12 @@ int main(int argc, char **argv) {
     term_msg("\nUnsupported Transformation: %s\n", argv[1]);
   }
 
+  // Save output to disk
   Mat out_image;
 
   switch (result) {
+    case RES_NONE:
+      term_msg("\nTransformation returned no result!\n");
     case RES_ARRAY:
       out_image = Mat(raw_image.rows, raw_image.cols, CV_8UC4, &image);
       break;
@@ -99,6 +99,9 @@ int main(int argc, char **argv) {
   }
 
   imwrite(argv[3], out_image);
+
+  // Cleanup memory
+  free(image);
 
   return 0;
 }

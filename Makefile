@@ -1,19 +1,21 @@
 GCC=g++
 NVCC=nvcc
-INCDIRS=-I./lib
-LD=-lopencv_core -lopencv_imgproc -lopencv_highgui
+LD=-lopencv_core -lopencv_imgproc -lopencv_highgui -lopencv_imgproc
 
 
 pre-build:
 	mkdir -p ./dist
 
 plain: pre-build
-	$(GCC) -x c++ src/imgtrans.c src/plain.c $(INCDIRS) $(LD) -o dist/imgtrans-plain
+	$(GCC) -x c++ src/plain.c src/imgtrans.c $(LD) -o dist/imgtrans-plain
 
 opencv: pre-build
-	$(GCC) -x c++ src/imgtrans.c src/opencv.c $(INCDIRS) $(LD) -o dist/imgtrans-opencv
+	$(GCC) -x c++ src/opencv.c src/imgtrans.c $(LD) -o dist/imgtrans-opencv
 
 cuda: pre-build
-	$(NVCC) src/imgtrans.c src/cuda.cu $(INCDIRS) $(LD) -o dist/imgtrans-cuda
+	$(NVCC) -x cu src/cuda.cu src/imgtrans.c $(LD) -o dist/imgtrans-cuda
+
+clean: pre-build
+	rm -rf ./dist/*
 
 all: plain opencv cuda
