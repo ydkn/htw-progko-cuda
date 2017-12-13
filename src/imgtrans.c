@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
+#include <sys/time.h>
 #include <opencv2/opencv.hpp>
 #include "common.h"
 
@@ -65,6 +66,10 @@ int main(int argc, char **argv) {
 
   int result = RES_NONE;
 
+  // Measure elapsed time
+  struct timeval time_start, time_end;
+  gettimeofday(&time_start, NULL);
+
   // Switch transformation type
   if (strcmp(argv[1], "swap") == 0) {
     result = swap(raw_image, raw_image.cols, raw_image.rows, image);
@@ -82,6 +87,10 @@ int main(int argc, char **argv) {
     term_msg("\nUnsupported Transformation: %s\n", argv[1]);
   }
 
+  // Measure elapsed time
+  gettimeofday(&time_end, NULL);
+  printf("\nElapsed time: %d usec\n", (time_end.tv_usec - time_start.tv_usec) + ((time_end.tv_sec - time_start.tv_sec) * 1000000));
+
   // Save output to disk
   Mat out_image;
 
@@ -89,7 +98,7 @@ int main(int argc, char **argv) {
     case RES_NONE:
       term_msg("\nTransformation returned no result!\n");
     case RES_ARRAY:
-      out_image = Mat(raw_image.rows, raw_image.cols, CV_8UC4, &image);
+      out_image = Mat(raw_image.rows, raw_image.cols, CV_8UC4, image);
       break;
     case RES_IMAGE:
       out_image = raw_image;
