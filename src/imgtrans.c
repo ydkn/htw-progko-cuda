@@ -49,7 +49,9 @@ int main(int argc, char **argv) {
   if (!raw_image.data) {
     term_msg("Unable to load image: %s\n", argv[2]);
   } else {
+    #ifndef GNUPLOT_MODE
     printf("Using image: %s\n", argv[2]);
+    #endif
   }
 
   // convert image/matrix to a plain 2-dim array to allow passing same input to all functions
@@ -89,7 +91,11 @@ int main(int argc, char **argv) {
 
   // Measure elapsed time
   gettimeofday(&time_end, NULL);
+  #ifndef GNUPLOT_MODE
   printf("\nElapsed time: %ld usec\n", (time_end.tv_usec - time_start.tv_usec) + ((time_end.tv_sec - time_start.tv_sec) * 1000000));
+  #else
+  printf("%ld", (time_end.tv_usec - time_start.tv_usec) + ((time_end.tv_sec - time_start.tv_sec) * 1000000));
+  #endif
 
   // Save output to disk
   Mat out_image;

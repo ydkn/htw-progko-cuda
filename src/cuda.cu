@@ -133,7 +133,9 @@ static void showCudaInfo() {
 // Wrapper for all CUDA kernels
 void cuda(int type, uint32_t width, uint32_t height, uint32_t *data, uint8_t area) {
   // Show CUDA infos
+  #ifndef GNUPLOT_MODE
   showCudaInfo();
+  #endif
 
   size_t buffer_size = width * height * sizeof(uint32_t);
   uint32_t *dev_in, *dev_out;

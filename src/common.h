@@ -4,6 +4,7 @@
 */
 
 #include <stdlib.h>
+#include "config.h"
 
 
 #pragma mark Color Channel Indices
