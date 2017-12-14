@@ -29,10 +29,10 @@ void term_msg(const char *fmt, ...) {
 
 #pragma mark transformations
 
-extern int swap(cv::Mat image, uint32_t width, uint32_t height, uint32_t *data);
-extern int gray(cv::Mat image, uint32_t width, uint32_t height, uint32_t *data);
-extern int blur(cv::Mat image, uint32_t width, uint32_t height, uint32_t *data, uint8_t area);
-extern int emboss(cv::Mat image, uint32_t width, uint32_t height, uint32_t *data);
+extern int swap(cv::Mat *image, uint32_t width, uint32_t height, uint32_t *data);
+extern int gray(cv::Mat *image, uint32_t width, uint32_t height, uint32_t *data);
+extern int blur(cv::Mat *image, uint32_t width, uint32_t height, uint32_t *data, uint8_t area);
+extern int emboss(cv::Mat *image, uint32_t width, uint32_t height, uint32_t *data);
 
 
 #pragma mark main
@@ -72,24 +72,24 @@ int main(int argc, char **argv) {
 
   // Switch transformation type
   if (strcmp(argv[1], "swap") == 0) {
-    result = swap(raw_image, raw_image.cols, raw_image.rows, image);
+    result = swap(&raw_image, raw_image.cols, raw_image.rows, image);
   } else if (strcmp(argv[1], "gray") == 0) {
-    result = gray(raw_image, raw_image.cols, raw_image.rows, image);
+    result = gray(&raw_image, raw_image.cols, raw_image.rows, image);
   } else if (strcmp(argv[1], "blur") == 0) {
     int area = 11;
 
     if (argc == 5) { area = atoi(argv[4]); }
 
-    result = blur(raw_image, raw_image.cols, raw_image.rows, image, area);
+    result = blur(&raw_image, raw_image.cols, raw_image.rows, image, area);
   } else if (strcmp(argv[1], "emboss") == 0) {
-    result = emboss(raw_image, raw_image.cols, raw_image.rows, image);
+    result = emboss(&raw_image, raw_image.cols, raw_image.rows, image);
   } else {
     term_msg("\nUnsupported Transformation: %s\n", argv[1]);
   }
 
   // Measure elapsed time
   gettimeofday(&time_end, NULL);
-  printf("\nElapsed time: %d usec\n", (time_end.tv_usec - time_start.tv_usec) + ((time_end.tv_sec - time_start.tv_sec) * 1000000));
+  printf("\nElapsed time: %ld usec\n", (time_end.tv_usec - time_start.tv_usec) + ((time_end.tv_sec - time_start.tv_sec) * 1000000));
 
   // Save output to disk
   Mat out_image;

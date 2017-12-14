@@ -177,25 +177,25 @@ void cuda(int type, uint32_t width, uint32_t height, uint32_t *data, uint8_t are
 
 #pragma mark Transformations
 
-int swap(cv::Mat image, uint32_t width, uint32_t height, uint32_t *data) {
+int swap(cv::Mat *image, uint32_t width, uint32_t height, uint32_t *data) {
   cuda(CUDA_SWAP, width, height, data, 0);
 
   return RES_ARRAY;
 }
 
-int gray(cv::Mat image, uint32_t width, uint32_t height, uint32_t *data) {
+int gray(cv::Mat *image, uint32_t width, uint32_t height, uint32_t *data) {
   cuda(CUDA_GRAY, width, height, data, 0);
 
   return RES_ARRAY;
 }
 
-int blur(cv::Mat image, uint32_t width, uint32_t height, uint32_t *data, uint8_t area) {
+int blur(cv::Mat *image, uint32_t width, uint32_t height, uint32_t *data, uint8_t area) {
   cuda(CUDA_BLUR, width, height, data, area);
 
   return RES_ARRAY;
 }
 
-int emboss(cv::Mat image, uint32_t width, uint32_t height, uint32_t *data) {
+int emboss(cv::Mat *image, uint32_t width, uint32_t height, uint32_t *data) {
   cuda(CUDA_EMBOSS, width, height, data, 0);
 
   return RES_ARRAY;
