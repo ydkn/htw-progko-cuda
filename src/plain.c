@@ -26,6 +26,16 @@ int swap(cv::Mat *image, uint32_t width, uint32_t height, uint32_t *data) {
 #pragma mark Grayscale
 
 int gray(cv::Mat *image, uint32_t width, uint32_t height, uint32_t *data) {
+  for (int i = 0; i < height; i++) {
+    for (int j = 0; j < width; j++) {
+      int idx = (i * width) + j;
+
+      uint8_t gray = (0.21 * RED(data[idx])) + (0.72 * GREEN(data[idx])) + (0.07 * BLUE(data[idx]));
+
+      data[idx] = RGBA(gray, gray, gray, ALPHA(data[idx]));
+    }
+  }
+
   return RES_ARRAY;
 }
 
