@@ -15,11 +15,16 @@ uint8_t const BLUE_IDX  = 2;
 uint8_t const ALPHA_IDX = 3;
 
 
-#pragma mark Result Types
+#pragma mark Results
 
 int const RES_NONE  = 0;
 int const RES_ARRAY = 1;
 int const RES_IMAGE = 2;
+
+struct result {
+	int  code;
+	long runtime;
+};
 
 
 #pragma mark Preprocessor functions

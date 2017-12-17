@@ -131,7 +131,7 @@ static void showCudaInfo() {
 }
 
 // Wrapper for all CUDA kernels
-void cuda(int type, uint32_t width, uint32_t height, uint32_t *data, uint8_t area) {
+result cuda(int type, uint32_t width, uint32_t height, uint32_t *data, uint8_t area) {
   // Show CUDA infos
   #ifndef GNUPLOT_MODE
   showCudaInfo();
@@ -147,25 +147,38 @@ void cuda(int type, uint32_t width, uint32_t height, uint32_t *data, uint8_t are
   // Copy image data to device
   CUDA_CHECK(cudaMemcpy(dev_in, data, buffer_size, cudaMemcpyHostToDevice));
 
-  dim3 grid(width, height);
+  // Measure execution time
+  cudaEvent_t start, stop;
+  cudaEventCreate(&start);
+  cudaEventCreate(&stop);
+
+  dim3 threads(8, 8);
+  dim3 blocks((width / threads.x + 1), (height / threads.y + 1));
+
+  cudaEventRecord(start);
 
   switch(type) {
     case CUDA_SWAP:
-      kernel_swap<<<grid, 1>>>(dev_in, dev_out, width, height);
+      kernel_swap<<<blocks, threads>>>(dev_in, dev_out, width, height);
       break;
 
     case CUDA_GRAY:
-      kernel_gray<<<grid, 1>>>(dev_in, dev_out, width, height);
+      kernel_gray<<<blocks, threads>>>(dev_in, dev_out, width, height);
       break;
 
     case CUDA_BLUR:
-      kernel_blur<<<grid, 1>>>(dev_in, dev_out, width, height, area);
+      kernel_blur<<<blocks, threads>>>(dev_in, dev_out, width, height, area);
       break;
 
     case CUDA_EMBOSS:
-      kernel_emboss<<<grid, 1>>>(dev_in, dev_out, width, height);
+      kernel_emboss<<<blocks, threads>>>(dev_in, dev_out, width, height);
       break;
   }
+
+  cudaEventRecord(stop);
+  cudaEventSynchronize(stop);
+  float runtime = 0;
+  cudaEventElapsedTime(&runtime, start, stop);
 
   // Copy transformed image data from device
   CUDA_CHECK(cudaMemcpy(data, dev_out, buffer_size, cudaMemcpyDeviceToHost));
@@ -174,31 +187,29 @@ void cuda(int type, uint32_t width, uint32_t height, uint32_t *data, uint8_t are
 
   // Terminate CUDA device usage
   CUDA_CHECK(cudaDeviceReset());
+
+  struct result res;
+  res.code    = RES_ARRAY;
+  res.runtime = (long) (runtime * 1000);
+
+  return res;
 }
 
 
 #pragma mark Transformations
 
-int swap(cv::Mat *image, uint32_t width, uint32_t height, uint32_t *data) {
-  cuda(CUDA_SWAP, width, height, data, 0);
-
-  return RES_ARRAY;
+result swap(cv::Mat *image, uint32_t width, uint32_t height, uint32_t *data) {
+  return cuda(CUDA_SWAP, width, height, data, 0);
 }
 
-int gray(cv::Mat *image, uint32_t width, uint32_t height, uint32_t *data) {
-  cuda(CUDA_GRAY, width, height, data, 0);
-
-  return RES_ARRAY;
+result gray(cv::Mat *image, uint32_t width, uint32_t height, uint32_t *data) {
+  return cuda(CUDA_GRAY, width, height, data, 0);
 }
 
-int blur(cv::Mat *image, uint32_t width, uint32_t height, uint32_t *data, uint8_t area) {
-  cuda(CUDA_BLUR, width, height, data, area);
-
-  return RES_ARRAY;
+result blur(cv::Mat *image, uint32_t width, uint32_t height, uint32_t *data, uint8_t area) {
+  return cuda(CUDA_BLUR, width, height, data, area);
 }
 
-int emboss(cv::Mat *image, uint32_t width, uint32_t height, uint32_t *data) {
-  cuda(CUDA_EMBOSS, width, height, data, 0);
-
-  return RES_ARRAY;
+result emboss(cv::Mat *image, uint32_t width, uint32_t height, uint32_t *data) {
+  return cuda(CUDA_EMBOSS, width, height, data, 0);
 }

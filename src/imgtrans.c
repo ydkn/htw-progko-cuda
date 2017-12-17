@@ -29,10 +29,10 @@ void term_msg(const char *fmt, ...) {
 
 #pragma mark transformations
 
-extern int swap(cv::Mat *image, uint32_t width, uint32_t height, uint32_t *data);
-extern int gray(cv::Mat *image, uint32_t width, uint32_t height, uint32_t *data);
-extern int blur(cv::Mat *image, uint32_t width, uint32_t height, uint32_t *data, uint8_t area);
-extern int emboss(cv::Mat *image, uint32_t width, uint32_t height, uint32_t *data);
+extern result swap(cv::Mat *image, uint32_t width, uint32_t height, uint32_t *data);
+extern result gray(cv::Mat *image, uint32_t width, uint32_t height, uint32_t *data);
+extern result blur(cv::Mat *image, uint32_t width, uint32_t height, uint32_t *data, uint8_t area);
+extern result emboss(cv::Mat *image, uint32_t width, uint32_t height, uint32_t *data);
 
 
 #pragma mark main
@@ -66,7 +66,9 @@ int main(int argc, char **argv) {
     }
   }
 
-  int result = RES_NONE;
+  struct result res;
+  res.code    = RES_NONE;
+  res.runtime = 0;
 
   // Measure elapsed time
   struct timeval time_start, time_end;
@@ -74,17 +76,17 @@ int main(int argc, char **argv) {
 
   // Switch transformation type
   if (strcmp(argv[1], "swap") == 0) {
-    result = swap(&raw_image, raw_image.cols, raw_image.rows, image);
+    res = swap(&raw_image, raw_image.cols, raw_image.rows, image);
   } else if (strcmp(argv[1], "gray") == 0) {
-    result = gray(&raw_image, raw_image.cols, raw_image.rows, image);
+    res = gray(&raw_image, raw_image.cols, raw_image.rows, image);
   } else if (strcmp(argv[1], "blur") == 0) {
     int area = 11;
 
     if (argc == 5) { area = atoi(argv[4]); }
 
-    result = blur(&raw_image, raw_image.cols, raw_image.rows, image, area);
+    res = blur(&raw_image, raw_image.cols, raw_image.rows, image, area);
   } else if (strcmp(argv[1], "emboss") == 0) {
-    result = emboss(&raw_image, raw_image.cols, raw_image.rows, image);
+    res = emboss(&raw_image, raw_image.cols, raw_image.rows, image);
   } else {
     term_msg("\nUnsupported Transformation: %s\n", argv[1]);
   }
@@ -92,15 +94,23 @@ int main(int argc, char **argv) {
   // Measure elapsed time
   gettimeofday(&time_end, NULL);
   #ifndef GNUPLOT_MODE
-  printf("\nElapsed time: %ld usec\n", (time_end.tv_usec - time_start.tv_usec) + ((time_end.tv_sec - time_start.tv_sec) * 1000000));
+  printf(
+    "\nElapsed time: %ld usec (%ld usec)\n",
+    (time_end.tv_usec - time_start.tv_usec) + ((time_end.tv_sec - time_start.tv_sec) * 1000000),
+    res.runtime
+  );
   #else
-  printf("%ld", (time_end.tv_usec - time_start.tv_usec) + ((time_end.tv_sec - time_start.tv_sec) * 1000000));
+  printf(
+    "%ld %ld",
+    (time_end.tv_usec - time_start.tv_usec) + ((time_end.tv_sec - time_start.tv_sec) * 1000000),
+    res.runtime
+  );
   #endif
 
   // Save output to disk
   Mat out_image;
 
-  switch (result) {
+  switch (res.code) {
     case RES_NONE:
       term_msg("\nTransformation returned no result!\n");
     case RES_ARRAY:
@@ -110,7 +120,7 @@ int main(int argc, char **argv) {
       out_image = raw_image;
       break;
     default:
-      term_msg("\nTransformation returned unkown result type: %d\n", result);
+      term_msg("\nTransformation returned unkown result type: %d\n", res.code);
   }
 
   imwrite(argv[3], out_image);

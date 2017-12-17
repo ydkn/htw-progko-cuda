@@ -1,6 +1,6 @@
 GCC=g++
 NVCC=nvcc
-LD=-lopencv_core -lopencv_imgproc -lopencv_highgui -lopencv_imgproc
+LD=-lopencv_core -lopencv_imgproc -lopencv_highgui
 
 
 pre-build:

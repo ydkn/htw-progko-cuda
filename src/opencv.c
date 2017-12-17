@@ -13,7 +13,7 @@ using namespace cv;
 
 #pragma mark Swap Green/Blue
 
-int swap(cv::Mat *image, uint32_t width, uint32_t height, uint32_t *data) {
+result swap(cv::Mat *image, uint32_t width, uint32_t height, uint32_t *data) {
   Mat channels[4];
 
   split(*image, channels);
@@ -26,28 +26,44 @@ int swap(cv::Mat *image, uint32_t width, uint32_t height, uint32_t *data) {
 
   merge(channels, 4, *image);
 
-  return RES_IMAGE;
+  struct result res;
+  res.code    = RES_IMAGE;
+  res.runtime = 0;
+
+  return res;
 }
 
 
 #pragma mark Grayscale
 
-int gray(cv::Mat *image, uint32_t width, uint32_t height, uint32_t *data) {
+result gray(cv::Mat *image, uint32_t width, uint32_t height, uint32_t *data) {
   cvtColor(*image, *image, CV_BGR2GRAY);
 
-  return RES_IMAGE;
+  struct result res;
+  res.code    = RES_IMAGE;
+  res.runtime = 0;
+
+  return res;
 }
 
 
 #pragma mark Blur
 
-int blur(cv::Mat *image, uint32_t width, uint32_t height, uint32_t *data, uint8_t area) {
-  return RES_NONE;
+result blur(cv::Mat *image, uint32_t width, uint32_t height, uint32_t *data, uint8_t area) {
+  struct result res;
+  res.code    = RES_IMAGE;
+  res.runtime = 0;
+
+  return res;
 }
 
 
 #pragma mark Emboss
 
-int emboss(cv::Mat *image, uint32_t width, uint32_t height, uint32_t *data) {
-  return RES_NONE;
+result emboss(cv::Mat *image, uint32_t width, uint32_t height, uint32_t *data) {
+  struct result res;
+  res.code    = RES_IMAGE;
+  res.runtime = 0;
+
+  return res;
 }
