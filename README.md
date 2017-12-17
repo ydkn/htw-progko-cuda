@@ -12,22 +12,29 @@ Supports the following image transformations:
 
 Run:
 
-    $ make
+    $ make all
 
 
 ## Usage
 
-    $ dist/cudatransform <swap|gray|blur|emboss> <infile> <outfile> (<area>)
+    $ dist/imgtrans-cuda <swap|gray|blur|emboss> <infile> <outfile> (<area>)
+    $ dist/imgtrans-opencv <swap|gray|blur|emboss> <infile> <outfile> (<area>)
+    $ dist/imgtrans-plain <swap|gray|blur|emboss> <infile> <outfile> (<area>)
 
 * &lt;area&gt; is only used for blur mode.
 
 
-
 ### Examples
 
-    $ dist/cudatransform swap examples/dice.png swapped_dice.png
-    $ dist/cudatransform gray examples/Periodic_table_large.png gray_periodic_table.png
+    $ dist/imgtrans-opencv swap examples/dice.png swapped_dice.png
+    $ dist/imgtrans-cuda gray examples/Periodic_table_large.png gray_periodic_table.png
 
+
+### Image Sources
+
+* tricoloring.png: https://commons.wikimedia.org/wiki/File:Tricoloring.png
+* dice.png: https://commons.wikimedia.org/wiki/File:PNG_transparency_demonstration_1.png
+* periodic_table.png: https://commons.wikimedia.org/wiki/File:Periodic_table_large.png
 
 ## License
 
