@@ -65,7 +65,7 @@ Ein Vergleich von der Berechnung der Matrix auf der CPU anstatt auf der GPU soll
 
 Eine png-Datei ist eine Rastergrafik, die aus Pixeln besteht. Die Gesamtheit der Pixel ergeben zusammen ein Bild, wobei jedes Pixel eine Farbe repräsentiert. Die Farbe ergibt sich aus den drei Farbkanälen, Rot, Grün und Blau und optional aus einem vierten Kanal Alpha. Die Gesamtzahl der Pixel ergibt sich aus dem Produkt der Höhe und Breite des Bildes. Auf jedes Pixel des Ausgangsbilds wird eine Matrix angewandt, die die Werte der Farbkanäle enthält. Darauf werden für die Konvertierung zu Emboss, Blur, luminosity Grau oder Austausch grüner mit blauen Komponenten der entsprechende Algorithmus angewandt. Da auf jedes Pixel der gleiche Algorithmus angewandt wird, ist er für eine Parallelisierung geeignet und dementsprechend auch für Cuda.\\
 
-Im Cuda Programmiermodel werden die CPU und die GPU für Berechnungen verwendet. Dabei wird in der Cuda Terminologie die CPU und deren Speicher als Host bezeichnet und die GPU und deren Speicher als Device. Der auszuführende Code wird auf dem Host ausgeführt. Vom Host aus wird der Speicher auf der Seite des Hosts und Devices gemanaged. Die auszuführenden Algorithmen bzw. Funktionen werden vom Kernel auf dem Device bereit gestellt. Es können ein oder mehrere Kernel aufgerufen werden, die auf dem Device mehrere Threads parallel ausführen können. Jeder Pixel repräsentiert ein Thread.\\
+Im Cuda Programmiermodel werden die CPU und die GPU für Berechnungen verwendet. Dabei wird in der Cuda Terminologie die CPU und deren Speicher als Host bezeichnet und die GPU und deren Speicher als Device. Der auszuführende Code wird auf dem Host ausgeführt. Vom Host aus wird der Speicher des Hosts und Devices gemanaged. Die auszuführenden Algorithmen bzw. Funktionen werden vom Kernel auf dem Device bereit gestellt. Es können ein oder mehrere Kernel aufgerufen werden, die auf dem Device mehrere Threads parallel ausführen können. Jeder Pixel repräsentiert ein Thread.\\
 
 Ein Cuda Programm durchläuft dementsprechend folgende Schritte:
 \begin{enumerate}
@@ -76,13 +76,14 @@ Ein Cuda Programm durchläuft dementsprechend folgende Schritte:
 	\item Ergebnisse vom Device auf den Host transportieren
 \end{enumerate}
 
+In den folgenden Abschnitten wird anhand von Code Beispielen demonstriert, wie ein Cuda Programm praktisch umgesetzt wird.\\
 %Daraus entsteht eine Matrix, in der zu jedem Pixel vier Werte zugeordnet werden. Diese Matrix wird in ein Array gespeichert. Jeder Kanal kann einen Wert zwischen 0 und 255 annehmen und repräsentiert 
 
 %
 \subsection{Erstellen einer RGBA Matrix aus einer png-Datei}
 %
 Die Bilddatei wird mit Hilfe der pnglite Bibliothek geladen und gespeichert.
-\begin{lstlisting}/*[frame=single]*/
+\begin{lstlisting}
 #include "pnglite.h"
 extern const char *__progname;
 \end{lstlisting}
@@ -112,15 +113,55 @@ todo: initialisieren der Daten code\\
 	Inhalt...
 \end{lstlisting}
 
-Auf dem Host werden weiterhin die Daten vom Speicher des Host in den den Speicher des Devices kopiert.\\ 
+Auf dem Host werden weiterhin die Daten vom Speicher des Host in den Speicher des Devices kopiert.\\ 
 
 \begin{lstlisting}[]
 CUDA_CHECK(cudaMemcpy(dev_imgdata, img_data, buffer_size, cudaMemcpyHostToDevice));
 dim3 grid(img->width, img->height);
 \end{lstlisting}
 
-Ab jetzt werden die Kernelfunktionen auf dem Device ausgeführt. Dafür wird der Kernel definiert. Cuda besitzt Erweiterungen, den sogenannten Qualifizierer. Der Qualifizierer \textunderscore\textunderscore global \textunderscore\textunderscore weist darauf hin, dass es sich um einen Kernel handelt. Er wird einer Funktion voran gestellt und zeigt an, dass die Funktion von der CPU bzw. den Host aufgerufen wird und auf der GPU bzw. dem Device ausgeführt wird. Zusätzlich muss die Größe des Grids und die Größe des Blocks definiert werden auf der der Kernel ausgeführt wird \cite{NVIDIACorporation.2017}.\\
-todo grid block definition
+Ab jetzt werden die Kernelfunktionen auf dem Device ausgeführt. Dafür wird der Kernel definiert. Cuda besitzt Erweiterungen, den sogenannten Qualifizierer. Der Qualifizierer \textunderscore\textunderscore global \textunderscore\textunderscore weist darauf hin, dass es sich um einen Kernel handelt. Er wird einer Funktion voran gestellt und zeigt an, dass die Funktion von der CPU bzw. den Host aufgerufen und auf der GPU bzw. dem Device ausgeführt wird. Dabei wird der Kernel auf der GPU von mehreren Threads parallel ausgeführt. Die Anzahl der Threads werden mit dem Aufruf des Kernels angegeben. Dabei werden dem Kernel zwei Parameter übergeben, die die Dimension des Grids und der Blöcke definieren. Die Dimension der Blöcke kann dreidimensional definiert werden. Sie gruppieren die Threads. Somit bestehen Blöcke aus Threads und mehrere Blöcke bilden wiederum ein Grid. Für die Grid Dimension können zweidimensionale Werte definiert werden. Ein Kernel kann zum Beispiel mit $2 * 2$ Blöcken und $4 * 2$ Threads pro Block gestartet werden.\\
+
+\begin{lstlisting}
+dim3 grid(2,2);
+dim3 block(4,2);
+kernel<<<grid,block>>>();
+\end{lstlisting}
+
+Jedem Block bzw. Thread wird ein Index zugewiesen. Mit Hilfe von blockIdx.x, blockIdx.y und threadIdx.x, threadIdx.y kann auf die Indicies zugegriffen werden.\\
+
+ \cite{NVIDIACorporation.2017}.\\
+
+Für die Konvertierung der png-Datei wird beispielsweise für den Tausch von Grün und Blau der Kernel "kernel\textunderscore swap\textunderscore green\textunderscore blue" aufgerufen und ein Thread pro Block definiert. Die Anzahl der Blöcke wird über die Höhe und Breite des Bildes definiert. Auf diese Weise wird pro Pixel ein Thread ausgeführt.\\
+ 
+\begin{lstlisting}
+dim3 grid(img->width, img->height);
+
+kernel_swap_green_blue<<<grid, 1>>>(dev_imgdata, dev_imgdata_out, img->width, img->height);
+\end{lstlisting}
+
+Bessere Performance ergibt sich bei Verwendung von $32*32$ Threads das der maximalen Anzahl an möglichen Threads auf der GPU entspricht. Dabei werden 0.01 Millisekunde anstatt 28,63 Millisekunden gebraucht.\\
+
+\begin{lstlisting}
+dim3 grid(img->width/1024, img->height/1024);
+dim3 block(32,32);
+\end{lstlisting}
+
+Zur Messung der Performance wurde ausschließlich die Ausführung auf dem Device gemessen, indem eine Start-, Stopfunktion um den Kernelbefehl gelegt wurde.\\
+
+\begin{lstlisting}
+ cudaEvent_t start, stop;
+float gpuTime;
+cudaEventCreate(&start);
+cudaEventCreate(&stop);
+
+cudaEventRecord(start, 0);
+kernel_swap_green_blue<<<grid, 1>>>(dev_imgdata, dev_imgdata_out, img->width, img->height);
+cudaEventRecord(stop, 0);
+cudaEventSynchronize(stop);
+cudaEventElapsedTime(&gpuTime, start, stop);
+printf("time spent executing by the GPU: %.2f milliseconds\n",gpuTime);
+\end{lstlisting}
 
 %
 \subsection{Parallele Konvertierung der Matrix zu luminosity Grau}
@@ -219,6 +260,30 @@ out[idx] = RGBA(RED(in[idx]), BLUE(in[idx]), GREEN(in[idx]), ALPHA(in[idx]));
 \end{lstlisting}
 %
 \subsection{Erstellen einer png-Datei aus der neuen RGBA-Matrix}
+%
+Die Ergebnisse werden vom Speicher des Devices auf den Host kopiert und anschließend wird der Speicher auf dem Device wieder frei gegeben. Weiterhin wird das Device zurückgesetzt, sodass alle Prozesse beendet sind.\\
+ 
+\begin{lstlisting}
+CUDA_CHECK(cudaMemcpy(out_img_data, dev_imgdata_out, buffer_size, cudaMemcpyDeviceToHost));
+CUDA_CHECK(cudaFree(dev_imgdata));
+CUDA_CHECK(cudaFree(dev_imgdata_out));
+CUDA_CHECK(cudaDeviceReset());
+\end{lstlisting}
+
+Die Funktionen save\textunderscore image() und png\textunderscore close\textunderscore file() speichern und schließen die neue png-Datei. Im letzten Schritt wird mit Hilfe der Funktion free() der Speicher auf den Host frei gegeben.\\
+
+%
+\section{Performancevergleich durch Verwendung unterschiedlicher Speicher}
+%
+\subsection{global Memory}
+%
+
+%
+\subsection{constant Memory}
+%
+
+%
+\subsection{shared Memory}
 %
 
 %
