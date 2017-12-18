@@ -149,13 +149,13 @@ result cuda(int type, uint32_t width, uint32_t height, uint32_t *data, uint8_t a
 
   // Measure execution time
   cudaEvent_t start, stop;
-  cudaEventCreate(&start);
-  cudaEventCreate(&stop);
+  CUDA_CHECK(cudaEventCreate(&start));
+  CUDA_CHECK(cudaEventCreate(&stop));
 
   dim3 threads(8, 8);
   dim3 blocks((width / threads.x + 1), (height / threads.y + 1));
 
-  cudaEventRecord(start);
+  CUDA_CHECK(cudaEventRecord(start));
 
   switch(type) {
     case CUDA_SWAP:
@@ -175,10 +175,12 @@ result cuda(int type, uint32_t width, uint32_t height, uint32_t *data, uint8_t a
       break;
   }
 
-  cudaEventRecord(stop);
-  cudaEventSynchronize(stop);
+  CUDA_CHECK(cudaEventRecord(stop));
+  CUDA_CHECK(cudaEventSynchronize(stop));
   float runtime = 0;
-  cudaEventElapsedTime(&runtime, start, stop);
+  CUDA_CHECK(cudaEventElapsedTime(&runtime, start, stop));
+  CUDA_CHECK(cudaEventDestroy(start));
+  CUDA_CHECK(cudaEventDestroy(stop));
 
   // Copy transformed image data from device
   CUDA_CHECK(cudaMemcpy(data, dev_out, buffer_size, cudaMemcpyDeviceToHost));

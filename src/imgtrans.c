@@ -62,6 +62,7 @@ int main(int argc, char **argv) {
       int raw_index = (i * raw_image.cols + j) * 4;
       int index     = (i * raw_image.cols) + j;
 
+      // construct single integer value representing all 4 color channels
       image[index] = RGBA(raw_image.data[raw_index + 0], raw_image.data[raw_index + 1], raw_image.data[raw_index + 2], raw_image.data[raw_index + 3]);
     }
   }

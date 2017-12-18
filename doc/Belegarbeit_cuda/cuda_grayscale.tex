@@ -7,10 +7,11 @@
 \usepackage{listingsutf8}
 \usepackage[T1]{fontenc}
 \usepackage{cite}
+\usepackage{graphicx}
 %
 \begin{document}
 	\lstset{language=c++, breaklines=true, frame=single}
-\markboth{Bildverarbeitung mit Cuda in C/C++}{Bildverarbeitung mit Cuda in C/C++}
+\markboth{Bildverarbeitung mit CUDA in C/C++}{Bildverarbeitung mit CUDA in C/C++}
 \thispagestyle{empty}
 %\begin{flushleft}
 %\LARGE  \centering Hochschule für Technik und Wirtschaft Berlin\\ %[1cm]
@@ -28,7 +29,7 @@
 \begin{flushright}
 \Huge
 \begin{tabular}{@{}l}
-Bildverarbeitung mit Cuda\\ in C/C++\\
+Bildverarbeitung mit CUDA\\ in C/C++\\
 RGB umrechnen\\ zu luminosity Grau\\[6pt]
 {\Large Version 0.1}
 \end{tabular}
@@ -51,254 +52,315 @@ Elsa Buchholz, s0544180, s0544180@htw-berlin.de \\
 %
 \section{Einleitung}
 %
-Mit Hilfe von Cuda soll ein beliebiges Bild in verschiedene Farbkonstellationen konvertiert werden. Dabei können vier  Möglichkeiten gewählt werden; Blur, Emboss, Grün-Blau-Wechsel und luminosity Grau.\\
+Mit Hilfe von CUDA soll ein beliebiges Bild in verschiedene Farbkonstellationen konvertiert werden. Dabei können vier  Möglichkeiten gewählt werden; Blur, Emboss, Grün-Blau-Wechsel und luminosity Grau.\\
 
-Das Bild wird in dieser Arbeit im png-Format verarbeitet. Mit der Programmiertechnik Cuda und der Programmiersprache C/C++ wird die Bildverarbeitung auf der GPU parallelisiert, um eine hohe Rechenleistung zu realisieren.\\
+Das Bild wird in dieser Arbeit im png-Format verarbeitet. Mit der Programmiertechnik CUDA und der Programmiersprache C/C++ wird die Bildverarbeitung auf der GPU parallelisiert, um eine hohe Rechenleistung zu realisieren.\\
 
-Um das Bild in seinen Farbwerten verändern zu können, müssen die Pixel des Bildes, die jeweils einen RGBA-Wert speichern, in einer Matrix gespeichert werden. Danach wird mit Hilfe von Cuda ein Algorithmus verwendet, der die Pixel-Werte neu berechnet und somit eine neue RGBA-Matrix hergestellt wird. Aus dieser Matrix wird anschließend eine neue png-Datei erstellt.\\
+Um das Bild in seinen Farbwerten verändern zu können, müssen die Pixel des Bildes, die jeweils einen RGBA-Wert speichern, in einer Matrix gespeichert werden. Danach wird mit Hilfe von CUDA ein Algorithmus verwendet, der die Pixel-Werte neu berechnet und somit eine neue RGBA-Matrix hergestellt wird. Aus dieser Matrix wird anschließend eine neue png-Datei erstellt.\\
 
-Ein Vergleich von der Berechnung der Matrix auf der CPU anstatt auf der GPU soll zeigen, dass das sequenzielle Durchlaufen der Pixel über eine Schleife langsamer ist, als das parallele Berechnen der Pixel auf der GPU. Zusätzlich wird die Programmierbibliothek OpenCV verwendet und mit Cuda verglichen. OpenCV und Cuda vollziehen beide die Berechnungen auf der GPU.\\ 
+Ein Vergleich von der Berechnung der Matrix auf der CPU anstatt auf der GPU soll zeigen, dass das sequenzielle Durchlaufen der Pixel über eine Schleife langsamer ist, als das parallele Berechnen der Pixel auf der GPU. Zusätzlich wird die Programmierbibliothek OpenCV verwendet und mit CUDA verglichen. OpenCV und CUDA vollziehen beide die Berechnungen auf der GPU.\\
 
 %
-\section{Konvertierung einer png-Datei}
+\section{Konvertierung einer PNG-Datei}
 %
 
-Eine png-Datei ist eine Rastergrafik, die aus Pixeln besteht. Die Gesamtheit der Pixel ergeben zusammen ein Bild, wobei jedes Pixel eine Farbe repräsentiert. Die Farbe ergibt sich aus den drei Farbkanälen, Rot, Grün und Blau und optional aus einem vierten Kanal Alpha. Die Gesamtzahl der Pixel ergibt sich aus dem Produkt der Höhe und Breite des Bildes. Auf jedes Pixel des Ausgangsbilds wird eine Matrix angewandt, die die Werte der Farbkanäle enthält. Darauf werden für die Konvertierung zu Emboss, Blur, luminosity Grau oder Austausch grüner mit blauen Komponenten der entsprechende Algorithmus angewandt. Da auf jedes Pixel der gleiche Algorithmus angewandt wird, ist er für eine Parallelisierung geeignet und dementsprechend auch für Cuda.\\
+Eine PNG-Datei ist eine Rastergrafik, die aus Pixeln besteht. Die Gesamtheit der Pixel ergeben zusammen ein Bild, wobei jedes Pixel eine Farbe repräsentiert. Die Farbe ergibt sich aus den drei Farbkanälen, Rot, Grün und Blau und optional aus einem vierten Kanal Alpha. Die Gesamtzahl der Pixel ergibt sich aus dem Produkt der Höhe und Breite des Bildes. Auf jedes Pixel des Ausgangsbilds wird eine Matrix angewandt, die die Werte der Farbkanäle enthält. Darauf werden für die Konvertierung zu Emboss, Blur, luminosity Grau oder Austausch grüner mit blauen Komponenten der entsprechende Algorithmus angewandt. Da auf jedes Pixel der gleiche Algorithmus angewandt wird, ist er für eine Parallelisierung geeignet und dementsprechend auch für CUDA.\\
 
-Im Cuda Programmiermodel werden die CPU und die GPU für Berechnungen verwendet. Dabei wird in der Cuda Terminologie die CPU und deren Speicher als Host bezeichnet und die GPU und deren Speicher als Device. Der auszuführende Code wird auf dem Host ausgeführt. Vom Host aus wird der Speicher des Hosts und Devices gemanaged. Die auszuführenden Algorithmen bzw. Funktionen werden vom Kernel auf dem Device bereit gestellt. Es können ein oder mehrere Kernel aufgerufen werden, die auf dem Device mehrere Threads parallel ausführen können. Jeder Pixel repräsentiert ein Thread.\\
+Im CUDA Programmiermodel werden die CPU und die GPU für Berechnungen verwendet. Dabei wird in der CUDA Terminologie die CPU und deren Speicher als Host bezeichnet und die GPU und deren Speicher als Device. Der auszuführende Code wird auf dem Host ausgeführt. Vom Host aus wird der Speicher des Hosts und Devices verwaltet. Die auszuführenden Algorithmen bzw. Funktionen werden vom Kernel auf dem Device bereit gestellt. Es können ein oder mehrere Kernel aufgerufen werden, die auf dem Device mehrere Threads parallel ausführen können. Jeder Pixel repräsentiert ein Thread.\\
 
-Ein Cuda Programm durchläuft dementsprechend folgende Schritte:
+Ein CUDA Programm durchläuft dementsprechend folgende Schritte:
 \begin{enumerate}
 	\item Speicher auf dem Host und Device zuweisen
-	\item Daten auf dem Host initialisieren
 	\item Daten vom Host auf das Device transportieren
 	\item Ausführen eines oder mehrerer Kernel
 	\item Ergebnisse vom Device auf den Host transportieren
 \end{enumerate}
 
-In den folgenden Abschnitten wird anhand von Code Beispielen demonstriert, wie ein Cuda Programm praktisch umgesetzt wird.\\
-%Daraus entsteht eine Matrix, in der zu jedem Pixel vier Werte zugeordnet werden. Diese Matrix wird in ein Array gespeichert. Jeder Kanal kann einen Wert zwischen 0 und 255 annehmen und repräsentiert 
+In den folgenden Abschnitten wird anhand von Code Beispielen demonstriert, wie ein CUDA Programm praktisch umgesetzt wird.\\
+%Daraus entsteht eine Matrix, in der zu jedem Pixel vier Werte zugeordnet werden. Diese Matrix wird in ein Array gespeichert. Jeder Kanal kann einen Wert zwischen 0 und 255 annehmen und repräsentiert
 
 %
-\subsection{Erstellen einer RGBA Matrix aus einer png-Datei}
+\subsection{Erstellen einer RGBA Matrix aus einer PNG-Datei}
 %
-Die Bilddatei wird mit Hilfe der pnglite Bibliothek geladen und gespeichert.
-\begin{lstlisting}
-#include "pnglite.h"
-extern const char *__progname;
-\end{lstlisting}
+Die Bilddatei wird mit Hilfe der OpenCV Bibliothek geladen und gespeichert.
 
-Das Programm wird aufgerufen, indem die zu lesende Datei, die Konvertierungsart und die Ergebnisdatei aufgerufen werden. Darauf hin wird das Bild geladen und der Speicher auf der CPU zugewiesen. \\
+Das Laden und auf Aufbauen des Arrays für die weitere Verarbeitung erfolgt folgendermaßen:
 
 \begin{lstlisting}
-png_init(0, 0);
+Mat raw_image = imread(argv[2], CV_LOAD_IMAGE_UNCHANGED);
 
-Image    *img          = read_image(argv[2]);
-uint32_t *img_data     = img->pixels;
-uint32_t *out_img_data = (uint32_t *) alloc_image_buffer(img);
+// convert image/matrix to a plain 2-dim array to allow passing same input to all functions
+uint32_t *image = (uint32_t *) malloc((raw_image.rows * raw_image.cols) * sizeof(uint32_t));
+
+for (int i = 0; i < raw_image.rows; i++) {
+  for (int j = 0; j < raw_image.cols; j++) {
+    int raw_index = (i * raw_image.cols + j) * 4;
+    int index     = (i * raw_image.cols) + j;
+
+    // construct single integer value representing all 4 color channels
+    image[index] = RGBA(raw_image.data[raw_index + 0], raw_image.data[raw_index + 1], raw_image.data[raw_index + 2], raw_image.data[raw_index + 3]);
+  }
+}
 \end{lstlisting}
 
-Mit den Funktionen read\textunderscore image() und der Funktion alloc\textunderscore image\textunderscore buffer() werden die Pixelanzahl des Bildes ermittelt und dafür entsprechend der Speicherplatz auf der CPU des Host zugewiesen.\\  
+%
+\subsection{Vorbereitung der Nutzung des Devices für die Bildtransformation}
+%
 
-Auf dem Device wird der Speicher mit der Funktion cudaMalloc() zugewiesen.\\ 
+Mit den Funktionen CUDAMalloc() wird der nötige Speicher auf dem Device reserviert um das Bild vom Host auf das Device kopieren zu können.
 
 \begin{lstlisting}
-CUDA_CHECK(cudaMalloc((void **) &dev_imgdata, buffer_size));
-CUDA_CHECK(cudaMalloc((void **) &dev_imgdata_out, buffer_size));
+size_t buffer_size = width * height * sizeof(uint32_t);
+uint32_t *dev_in, *dev_out;
+
+// Allocate memory on device
+CUDA_CHECK(cudaMalloc((void **) &dev_in, buffer_size));
+CUDA_CHECK(cudaMalloc((void **) &dev_out, buffer_size));
 \end{lstlisting}
 
-todo: initialisieren der Daten code\\
-
-\begin{lstlisting}
-	Inhalt...
-\end{lstlisting}
-
-Auf dem Host werden weiterhin die Daten vom Speicher des Host in den Speicher des Devices kopiert.\\ 
+Auf dem Host werden weiterhin die Daten vom Speicher des Host in den Speicher des Devices kopiert.\\
 
 \begin{lstlisting}[]
-CUDA_CHECK(cudaMemcpy(dev_imgdata, img_data, buffer_size, cudaMemcpyHostToDevice));
-dim3 grid(img->width, img->height);
+// Copy image data to device
+CUDA_CHECK(cudaMemcpy(dev_in, data, buffer_size, cudaMemcpyHostToDevice));
 \end{lstlisting}
 
-Ab jetzt werden die Kernelfunktionen auf dem Device ausgeführt. Dafür wird der Kernel definiert. Cuda besitzt Erweiterungen, den sogenannten Qualifizierer. Der Qualifizierer \textunderscore\textunderscore global \textunderscore\textunderscore weist darauf hin, dass es sich um einen Kernel handelt. Er wird einer Funktion voran gestellt und zeigt an, dass die Funktion von der CPU bzw. den Host aufgerufen und auf der GPU bzw. dem Device ausgeführt wird. Dabei wird der Kernel auf der GPU von mehreren Threads parallel ausgeführt. Die Anzahl der Threads werden mit dem Aufruf des Kernels angegeben. Dabei werden dem Kernel zwei Parameter übergeben, die die Dimension des Grids und der Blöcke definieren. Die Dimension der Blöcke kann dreidimensional definiert werden. Sie gruppieren die Threads. Somit bestehen Blöcke aus Threads und mehrere Blöcke bilden wiederum ein Grid. Für die Grid Dimension können zweidimensionale Werte definiert werden. Ein Kernel kann zum Beispiel mit $2 * 2$ Blöcken und $4 * 2$ Threads pro Block gestartet werden.\\
+Auf dem Referenz-Host (deepgreen04.f4.htw-berlin.de) gibt es 1024 Threads pro Multiprozessor. Eine Aufteilung in $32 * 32 = 1024$ Threads ist also sinnvoll um einen Multiprozessor maximal auszunutzen. Weiterhin muss die Gesamtgröße des Problems $with * height$ Pixel als einzelner Thread ausgeführt werden, daher werden $(width * height) / 1024$ Blöcke benötigt. Diese Blöcke werden ebenfalls 2-dimensional aufgeilt wie folgend zu sehen.
 
 \begin{lstlisting}
-dim3 grid(2,2);
-dim3 block(4,2);
-kernel<<<grid,block>>>();
+dim3 threads(32, 32);
+dim3 blocks((width / threads.x + 1), (height / threads.y + 1));
 \end{lstlisting}
 
-Jedem Block bzw. Thread wird ein Index zugewiesen. Mit Hilfe von blockIdx.x, blockIdx.y und threadIdx.x, threadIdx.y kann auf die Indicies zugegriffen werden.\\
-
- \cite{NVIDIACorporation.2017}.\\
-
-Für die Konvertierung der png-Datei wird beispielsweise für den Tausch von Grün und Blau der Kernel "kernel\textunderscore swap\textunderscore green\textunderscore blue" aufgerufen und ein Thread pro Block definiert. Die Anzahl der Blöcke wird über die Höhe und Breite des Bildes definiert. Auf diese Weise wird pro Pixel ein Thread ausgeführt.\\
- 
-\begin{lstlisting}
-dim3 grid(img->width, img->height);
-
-kernel_swap_green_blue<<<grid, 1>>>(dev_imgdata, dev_imgdata_out, img->width, img->height);
-\end{lstlisting}
-
-Bessere Performance ergibt sich bei Verwendung von $32*32$ Threads das der maximalen Anzahl an möglichen Threads auf der GPU entspricht. Dabei werden 0.01 Millisekunde anstatt 28,63 Millisekunden gebraucht.\\
+Der Aufruf des Kernels erfolgt mit Angabe des Grids, den Parametern für Blöcke und Threads.
 
 \begin{lstlisting}
-dim3 grid(img->width/1024, img->height/1024);
-dim3 block(32,32);
+kernel_gray<<<blocks, threads>>>(dev_in, dev_out, width, height);
 \end{lstlisting}
 
-Zur Messung der Performance wurde ausschließlich die Ausführung auf dem Device gemessen, indem eine Start-, Stopfunktion um den Kernelbefehl gelegt wurde.\\
-
-\begin{lstlisting}
- cudaEvent_t start, stop;
-float gpuTime;
-cudaEventCreate(&start);
-cudaEventCreate(&stop);
-
-cudaEventRecord(start, 0);
-kernel_swap_green_blue<<<grid, 1>>>(dev_imgdata, dev_imgdata_out, img->width, img->height);
-cudaEventRecord(stop, 0);
-cudaEventSynchronize(stop);
-cudaEventElapsedTime(&gpuTime, start, stop);
-printf("time spent executing by the GPU: %.2f milliseconds\n",gpuTime);
-\end{lstlisting}
 
 %
 \subsection{Parallele Konvertierung der Matrix zu luminosity Grau}
 %
+
+Auf den aktuelle Blockindex kann innerhalb jedes Threads des Kernels per $blockIdx.x$ und $blockIdx.y$ zugegriffen werden.\\
+
+Die Grauwertumwandlung erfolgt hierbei durch Addition der Gewichtungen der einzelnen Farbkanäle. 
+
 \begin{lstlisting}
-__global__ void kernel_gray(uint32_t *in, uint32_t *out, int w, int h){
-int idx = blockIdx.y * w + blockIdx.x;
-	
-// Check if thread index is no longer within input array
-if (ARRAY_LENGTH(in) >= idx) { return; }
-	
-uint8_t gray = (0.21 * RED(in[idx])) + (0.72 * GREEN(in[idx])) + (0.07 * BLUE(in[idx]));
-	
-out[idx] = RGBA(gray, gray, gray, ALPHA(in[idx]));
-}...
-\end{lstlisting}
-%
-\subsection{Parallele Konvertierung der Matrix zu Emboss}
-%
-\begin{lstlisting}
-__global__ void kernel_emboss(uint32_t *in, uint32_t *out, int w, int h) {
-if (blockIdx.y < 1 || blockIdx.x < 1) { return; }
+__global__ void kernel_gray(uint32_t *in, uint32_t *out, uint32_t w, uint32_t h) {
+  int idx = blockIdx.y * w + blockIdx.x;
 
-int idx     = blockIdx.y * w + blockIdx.x;
-int idx_ref = (blockIdx.y - 1) * w + (blockIdx.x - 1);
+  // Check if thread index is no longer within input array
+  if (ARRAY_LENGTH(in) >= idx) { return; }
 
-// Check if thread index is no longer within input array
-if (ARRAY_LENGTH(in) >= idx) { return; }
-if (ARRAY_LENGTH(in) >= idx_ref) { return; }
+  uint8_t gray = (0.21 * RED(in[idx])) + (0.72 * GREEN(in[idx])) + (0.07 * BLUE(in[idx]));
 
-int diffs[] = {
-(RED(in[idx_ref]) - RED(in[idx])),
-(GREEN(in[idx_ref]) - GREEN(in[idx])),
-(BLUE(in[idx_ref]) - BLUE(in[idx]))
-};
-
-int diff = diffs[0];
-if ((diffs[1] < 0 ? diffs[1] * -1 : diffs[1]) > diff) { diff = diffs[1]; }
-if ((diffs[2] < 0 ? diffs[2] * -1 : diffs[2]) > diff) { diff = diffs[2]; }
-
-int gray = 128 + diff;
-if (gray > 255) { gray = 255; }
-if (gray < 0) { gray = 0; }
-
-out[idx] = RGBA(gray, gray, gray, ALPHA(in[idx]));
+  out[idx] = RGBA(gray, gray, gray, ALPHA(in[idx]));
 }
 \end{lstlisting}
+
 %
-\subsection{Parallele Konvertierung der Matrix zu Blur}
+\subsection{Parallele Konvertierung der Matrix per Emboss}
 %
+
+Bei der Transformation per Emboss wird neben der aktuellen Position auch das jeweils links darüberliegende Pixel betrachtet. Bei der Betrachtung wird allgemein gesagt eine Differenz zwischen den einzelnen Kanälen bestimmt um Kanten hervorzuheben.
+
 \begin{lstlisting}
-__global__ void kernel_blur(uint32_t *in, uint32_t *out, int w, int h, int area) {
-int idx = blockIdx.y * w + blockIdx.x;
+__global__ void kernel_emboss(uint32_t *in, uint32_t *out, uint32_t w, uint32_t h) {
+  if (blockIdx.y < 1 || blockIdx.x < 1) { return; }
 
-// Check if thread index is no longer within input array
-if (ARRAY_LENGTH(in) >= idx) { return; }
+  int idx     = blockIdx.y * w + blockIdx.x;
+  int idx_ref = (blockIdx.y - 1) * w + (blockIdx.x - 1);
 
-uint32_t min_x      = blockIdx.x < area ? 0 : blockIdx.x - area;
-uint32_t min_y      = blockIdx.y < area ? 0 : blockIdx.y - area;
-uint32_t max_x      = (blockIdx.x + area) >= w ? w : blockIdx.x + area;
-uint32_t max_y      = (blockIdx.y + area) >= h ? h : blockIdx.y + area;
-uint32_t num_pixels = 0;
-uint32_t red_sum    = 0;
-uint32_t green_sum  = 0;
-uint32_t blue_sum   = 0;
-uint32_t alpha_sum  = 0;
-int      i          = 0;
+  // Check if thread index is no longer within input array
+  if (ARRAY_LENGTH(in) >= idx) { return; }
+  if (ARRAY_LENGTH(in) >= idx_ref) { return; }
 
-for(int x = min_x; x < max_x; x += 1) {
-for(int y = min_y; y < max_y; y += 1) {
-i = y * w + x;
+  int diffs[] = {
+    (RED(in[idx_ref]) - RED(in[idx])),
+    (GREEN(in[idx_ref]) - GREEN(in[idx])),
+    (BLUE(in[idx_ref]) - BLUE(in[idx]))
+  };
 
-num_pixels += 1;
-red_sum    += RED(in[i]);
-green_sum  += GREEN(in[i]);
-blue_sum   += BLUE(in[i]);
-alpha_sum  += ALPHA(in[i]);
+  int diff = diffs[0];
+  if ((diffs[1] < 0 ? diffs[1] * -1 : diffs[1]) > diff) { diff = diffs[1]; }
+  if ((diffs[2] < 0 ? diffs[2] * -1 : diffs[2]) > diff) { diff = diffs[2]; }
+
+  int gray = 128 + diff;
+  if (gray > 255) { gray = 255; }
+  if (gray < 0) { gray = 0; }
+
+  out[idx] = RGBA(gray, gray, gray, ALPHA(in[idx]));
 }
 }
+\end{lstlisting}
+%
+\subsection{Parallele Konvertierung der Matrix per Blur}
+%
+Bei der Anwendung von Blur wird der umliegende Bereich um ein Pixel betrachtet und der Durchschnittswert dieses Bereichs gebildet.
 
-out[idx] = RGBA((red_sum / num_pixels), (green_sum / num_pixels), (blue_sum / num_pixels), (alpha_sum / num_pixels));
+
+\begin{lstlisting}
+__global__ void kernel_blur(uint32_t *in, uint32_t *out, uint32_t w, uint32_t h, uint8_t area) {
+  int idx = blockIdx.y * w + blockIdx.x;
+
+  // Check if thread index is no longer within input array
+  if (ARRAY_LENGTH(in) >= idx) { return; }
+
+  uint32_t min_x      = blockIdx.x < area ? 0 : blockIdx.x - area;
+  uint32_t min_y      = blockIdx.y < area ? 0 : blockIdx.y - area;
+  uint32_t max_x      = (blockIdx.x + area) >= w ? w : blockIdx.x + area;
+  uint32_t max_y      = (blockIdx.y + area) >= h ? h : blockIdx.y + area;
+  uint32_t num_pixels = 0;
+  uint32_t red_sum    = 0;
+  uint32_t green_sum  = 0;
+  uint32_t blue_sum   = 0;
+  uint32_t alpha_sum  = 0;
+  uint32_t i          = 0;
+
+  for(int x = min_x; x < max_x; x += 1) {
+    for(int y = min_y; y < max_y; y += 1) {
+      i = y * w + x;
+
+      num_pixels += 1;
+      red_sum    += RED(in[i]);
+      green_sum  += GREEN(in[i]);
+      blue_sum   += BLUE(in[i]);
+      alpha_sum  += ALPHA(in[i]);
+    }
+  }
+
+  out[idx] = RGBA((red_sum / num_pixels), (green_sum / num_pixels), (blue_sum / num_pixels), (alpha_sum / num_pixels));
 }
 \end{lstlisting}
 %
 \subsection{Parallele Konvertierung der Matrix mit Austausch der blauen und grünen Komponenten}
 %
+Beim Tausch des blauen und grünen Farbkanals wird der RGBA-Wert neu kodiert indem der blaue mit dem grünen Farbkanal getauscht wird.
+
 \begin{lstlisting}
-__global__ void kernel_swap_green_blue(uint32_t *in, uint32_t *out, int w, int h){
-int idx = blockIdx.y * w + blockIdx.x;
+__global__ void kernel_swap(uint32_t *in, uint32_t *out, uint32_t w, uint32_t h) {
+  int idx = blockIdx.y * w + blockIdx.x;
 
-// Check if thread index is no longer within input array
-if (ARRAY_LENGTH(in) >= idx) { return; }
+  // Check if thread index is no longer within input array
+  if (ARRAY_LENGTH(in) >= idx) { return; }
 
-out[idx] = RGBA(RED(in[idx]), BLUE(in[idx]), GREEN(in[idx]), ALPHA(in[idx]));
+  out[idx] = RGBA(RED(in[idx]), BLUE(in[idx]), GREEN(in[idx]), ALPHA(in[idx]));
 }
 \end{lstlisting}
+
+
 %
-\subsection{Erstellen einer png-Datei aus der neuen RGBA-Matrix}
+\subsection{Verwendung des Ergebnisses der Bildtransformation}
 %
-Die Ergebnisse werden vom Speicher des Devices auf den Host kopiert und anschließend wird der Speicher auf dem Device wieder frei gegeben. Weiterhin wird das Device zurückgesetzt, sodass alle Prozesse beendet sind.\\
- 
+Das Ergebnis wird vom Speicher des Devices auf den Host kopiert und anschließend wird der Speicher auf dem Device wieder frei gegeben. Weiterhin wird das Device zurückgesetzt, sodass alle Prozesse beendet sind.\\
+
 \begin{lstlisting}
-CUDA_CHECK(cudaMemcpy(out_img_data, dev_imgdata_out, buffer_size, cudaMemcpyDeviceToHost));
-CUDA_CHECK(cudaFree(dev_imgdata));
-CUDA_CHECK(cudaFree(dev_imgdata_out));
+// Copy transformed image data from device
+CUDA_CHECK(cudaMemcpy(data, dev_out, buffer_size, cudaMemcpyDeviceToHost));
+CUDA_CHECK(cudaFree(dev_in));
+CUDA_CHECK(cudaFree(dev_out));
+
+// Terminate CUDA device usage
 CUDA_CHECK(cudaDeviceReset());
 \end{lstlisting}
 
-Die Funktionen save\textunderscore image() und png\textunderscore close\textunderscore file() speichern und schließen die neue png-Datei. Im letzten Schritt wird mit Hilfe der Funktion free() der Speicher auf den Host frei gegeben.\\
+%
+\subsection{Erstellen einer PNG-Datei aus der neuen RGBA-Matrix}
+%
+Um die transformierten Daten als Bild zu speichern werden diese zunächst in eine OpenCV-Matrix umgewandelt und anschließend über die Funktion imwrite() auf die Festplatte gespeichert.
+
+\begin{lstlisting}
+out_image = Mat(raw_image.rows, raw_image.cols, CV_8UC4, image);
+
+// Save output to disk
+imwrite(argv[3], out_image);
+\end{lstlisting}
+
+Zum Schluss wird der Speicher des Ursprungsbildes freigegeben.
+
+\begin{lstlisting}
+// Cleanup memory
+  free(image);
+\end{lstlisting}
+
 
 %
-\section{Performancevergleich durch Verwendung unterschiedlicher Speicher}
-%
-\subsection{global Memory}
+\section{Performance-Vergleiche}
 %
 
-%
-\subsection{constant Memory}
-%
+Im folgenden Kapitel werden Performance-Vergleiche und Analysen durchgeführt.
+Verwendet wurden immer quadratische Bilder. Angegeben in den Diagrammen ist die Größe immer für nur für eine Dimension.
 
 %
-\subsection{shared Memory}
+\subsection{Auswahl der Grid-Parameter}
 %
 
+Um höchst mögliche parallele Verarbeitung zu erreichen ist es wichtig die richtigen Parameter für das Grid zu wählen. Wählt man beispielsweise nur ein einziges Thread pro Block ergibt sich je nach Bildgröße eine Verschlechterung der Laufzeit um über 3000\%.
+
+\begin{figure}
+	\centering
+	\includegraphics[width=\textwidth,height=\textheight,keepaspectratio]{analysis_grids.png}
+	\caption{Vergleich unterschiedlicher Grid-Parameter}
+	\label{fig:analysis_grids}
+\end{figure}
+
+Gewählte Parameter für "Optimized":
+\begin{lstlisting}
+dim3 threads(32, 32);
+dim3 blocks((width / threads.x + 1), (height / threads.y + 1));
+\end{lstlisting}
+
+Gewählte Parameter für "Static":
+\begin{lstlisting}
+dim3 threads(1);
+dim3 blocks(width, height);
+\end{lstlisting}
+
 %
-\section{Performancevergleich der parallelen Umwandlung mit OpenCV auf der GPU und ohne Parallelisierung auf der CPU}
+\subsection{Umwandlung ohne Parallelisierung, mit OpenCV und auf der GPU mit CUDA}
 %
+
+Um äußere Einflüsse auf die Laufzeitmessungen möglichst klein zu halten wurden die Messungen 10-mal durchgeführt und die Durchschnittswerte der einzelnen Messwerte pro Implementierung verwendet.
+In \ref{fig:analysis} ist die Gesamtlaufzeit der unterschiedlichen Implementierungen zu sehen. Die Gesamtlaufzeit enthalt im Falle von CUDA auch das reservieren des GPU-Speichers sowie das Kopieren der Daten vom Host zum Device sowie das Kopieren das Ergebnisses vom Device auf den Host, das Freigeben des GPU-Speichers und das Zurücksetzen des Devices.
+
+\begin{figure}
+	\centering
+	\includegraphics[width=\textwidth,height=\textheight,keepaspectratio]{analysis.png}
+	\caption{Gesamtlaufzeit der drei unterschiedlichen Implementierungen}
+	\label{fig:analysis}
+\end{figure}
+
+Aus \ref{fig:analysis} ist ersichtlich, dass die Gesamtlaufzeit von der CUDA-Implementierung mit ca. 1,1 Sekunden weit über den Laufzeiten der beiden anderen Implementierungen liegt.
+Um dieses Ergebnis genauer vergleichen zu können wurde im Anschluss zusätzlich noch die Laufzeit des Konvertierungsalgorithmus selbst bestimmt. Diese effektiven Laufzeiten unterscheiden sich bei der Implementation ohne Parallelisieren und die Implementierung mit OpenCV nicht von der Gesamtlaufzeit. Bei der CUDA-Implementierung hingegen wird bei der effektiven Laufzeit nur der Aufruf und die Ausführung auf der GPU gemessen. Der Vergleich der effektiven Laufzeit der drei Implementierungen ist in \ref{fig:analysis_gpu} dargestellt.
+
+\begin{figure}
+	\centering
+	\includegraphics[width=\textwidth,height=\textheight,keepaspectratio]{analysis_gpu.png}
+	\caption{Effektive Laufzeit der unterschiedlichen Implementierungen}
+	\label{fig:analysis_gpu}
+\end{figure}
+
+Hierbei ist gut zu erkennen, dass die effektive Laufzeit auf der GPU aufgrund der hohen Parallelisierung im Vergleich zu den anderen beiden Implementierungen wesentlich geringer ist.
+
+\begin{figure}
+	\centering
+	\includegraphics[width=\textwidth,height=\textheight,keepaspectratio]{analysis_no_plain.png}
+	\caption{Vergleich der effektiven Laufzeit zwischen CUDA und OpenCV}
+	\label{fig:analysis_no_plain}
+\end{figure}
+
+Um einen besseren direkten Vergleich zwischen den Implementierungen	mit OpenCV und CUDA zu ermöglichen ist in \ref{fig:analysis_no_plain} nur der Vergleich zwischen diesen beiden Implementierungen dargestellt. Die unterschiedliche Wachstumsgeschwindigkeit ist ebenfalls gut in \ref{fig:analysis_no_plain} zu erkennen.
 
 %
 \section{Fazit}
 %
 
-%
-\newpage
-%
+Aus den Performanceuntersuchungen geht hervor, dass der Overhead bei der Verwendung von CUDA nicht ganz zu vernachlässigen ist. Die Verwendung von CUDA eigenen sich daher nicht bei kleinen Problemen. Der in der Untersuchung feststellbare Overhead lag bei ca. 1,1 Sekunden. Eine Verwendung eignet sich aufgrund dieser Ergebnisse erst wenn das zu lösende Problem anderweitig nicht in weniger als einer Sekunde zu lösen ist.\\
+Grundsätzlich ist die Parallelisierung eines Problems ratsam um die Gesamtlaufzeit möglichst kurz halten.\\
+Weiterhin ist es wichtig sich die Auswahl des verwendeten Grids genau zu überlegen, da bei schlecht gewählten Parametern starke Auswirkungen auf die Laufzeit festzustellen sind.
 
-\bibliography{bib}
 
 %
 \end{document}
