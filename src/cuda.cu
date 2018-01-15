@@ -34,11 +34,17 @@ int const CUDA_EMBOSS = 3;
 __global__ void kernel_swap(uint32_t *in, uint32_t *out, uint32_t w, uint32_t h) {
   uint32_t idx = (blockIdx.y * blockDim.y + threadIdx.y) * w + (blockIdx.x * blockDim.x) + threadIdx.x;
 
+  // Check if thread index is no longer within input array
+  if ((w * h) <= idx) { return; }
+
   out[idx] = RGBA(RED(in[idx]), BLUE(in[idx]), GREEN(in[idx]), ALPHA(in[idx]));
 }
 
 __global__ void kernel_gray(uint32_t *in, uint32_t *out, uint32_t w, uint32_t h) {
   uint32_t idx = (blockIdx.y * blockDim.y + threadIdx.y) * w + (blockIdx.x * blockDim.x) + threadIdx.x;
+
+  // Check if thread index is no longer within input array
+  if ((w * h) <= idx) { return; }
 
   uint8_t gray = (0.21 * RED(in[idx])) + (0.72 * GREEN(in[idx])) + (0.07 * BLUE(in[idx]));
 
@@ -49,6 +55,9 @@ __global__ void kernel_blur(uint32_t *in, uint32_t *out, uint32_t w, uint32_t h,
   uint32_t x = (blockIdx.x * blockDim.x) + threadIdx.x;
   uint32_t y = blockIdx.y * blockDim.y + threadIdx.y;
   uint32_t idx = y * w + x;
+
+  // Check if thread index is no longer within input array
+  if ((w * h) <= idx) { return; }
 
   uint32_t min_x      = x < area ? 0 : x - area;
   uint32_t min_y      = y < area ? 0 : y - area;
@@ -82,6 +91,10 @@ __global__ void kernel_emboss(uint32_t *in, uint32_t *out, uint32_t w, uint32_t 
   uint32_t idx     = (blockIdx.y * blockDim.y + threadIdx.y) * w + (blockIdx.x * blockDim.x) + threadIdx.x;
   uint32_t idx_ref = (blockIdx.y * blockDim.y + threadIdx.y - 1) * w + (blockIdx.x * blockDim.x) + threadIdx.x - 1;
 
+  // Check if thread index is no longer within input array
+  if ((w * h) <= idx) { return; }
+  if ((w * h) <= idx_ref) { return; }
+
   int diffs[] = {
     (RED(in[idx_ref]) - RED(in[idx])),
     (GREEN(in[idx_ref]) - GREEN(in[idx])),
@@ -111,6 +124,7 @@ static void showCudaInfo() {
   printf("Name: %s\n", prop.name);
   printf("Total Memory: %u Bytes\n", prop.totalGlobalMem);
   printf("Max. Threads Per Block: %d\n", prop.maxThreadsPerBlock);
+  printf("Max. Threads Per Dimension: (%d, %d, %d)\n", prop.maxThreadsDim[0], prop.maxThreadsDim[1], prop.maxThreadsDim[2]);
   printf("Clock Rate: %d kHz\n", prop.clockRate);
   printf("Multiprocessors: %d\n", prop.multiProcessorCount);
   printf("Concurrent Kernels: %d\n", prop.concurrentKernels);
@@ -138,7 +152,7 @@ result cuda(int type, uint32_t width, uint32_t height, uint32_t *data, uint8_t a
   CUDA_CHECK(cudaEventCreate(&start));
   CUDA_CHECK(cudaEventCreate(&stop));
 
-  dim3 threads(32, 32);
+  dim3 threads(1024, 1);
   dim3 blocks((width / threads.x + 1), (height / threads.y + 1));
 
   CUDA_CHECK(cudaEventRecord(start));
