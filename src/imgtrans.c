@@ -59,8 +59,8 @@ int main(int argc, char **argv) {
 
   for (int i = 0; i < raw_image.rows; i++) {
     for (int j = 0; j < raw_image.cols; j++) {
-      int raw_index = (i * raw_image.cols + j) * 4;
-      int index     = (i * raw_image.cols) + j;
+      uint32_t raw_index = (i * raw_image.cols + j) * 4;
+      uint32_t index     = (i * raw_image.cols) + j;
 
       // construct single integer value representing all 4 color channels
       image[index] = RGBA(raw_image.data[raw_index + 0], raw_image.data[raw_index + 1], raw_image.data[raw_index + 2], raw_image.data[raw_index + 3]);
@@ -124,7 +124,12 @@ int main(int argc, char **argv) {
       term_msg("\nTransformation returned unkown result type: %d\n", res.code);
   }
 
-  imwrite(argv[3], out_image);
+  // Write image to disk with PNG compression
+  vector<int> compression_params;
+  compression_params.push_back(CV_IMWRITE_PNG_COMPRESSION);
+  compression_params.push_back(9);
+
+  imwrite(argv[3], out_image, compression_params);
 
   // Cleanup memory
   free(image);

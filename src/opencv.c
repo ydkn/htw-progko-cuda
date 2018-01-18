@@ -37,7 +37,7 @@ result swap(cv::Mat *image, uint32_t width, uint32_t height, uint32_t *data) {
 #pragma mark Grayscale
 
 result gray(cv::Mat *image, uint32_t width, uint32_t height, uint32_t *data) {
-  cvtColor(*image, *image, CV_BGR2GRAY);
+  cvtColor(*image, *image, CV_BGRA2GRAY);
 
   struct result res;
   res.code    = RES_IMAGE;
