@@ -70,6 +70,7 @@ __global__ void kernel_blur(uint32_t *in, uint32_t *out, uint32_t w, uint32_t h,
   uint32_t alpha_sum  = 0;
   uint32_t i          = 0;
 
+  // Sum up color values within area
   for(int x = min_x; x < max_x; x += 1) {
     for(int y = min_y; y < max_y; y += 1) {
       i = y * w + x;
@@ -152,11 +153,13 @@ result cuda(int type, uint32_t width, uint32_t height, uint32_t *data, uint8_t a
   CUDA_CHECK(cudaEventCreate(&start));
   CUDA_CHECK(cudaEventCreate(&stop));
 
-  dim3 threads(1024, 1);
+  dim3 threads(32, 32);
   dim3 blocks((width / threads.x + 1), (height / threads.y + 1));
 
+  // Measure execution time
   CUDA_CHECK(cudaEventRecord(start));
 
+  // Run kernel on device
   switch(type) {
     case CUDA_SWAP:
       kernel_swap<<<blocks, threads>>>(dev_in, dev_out, width, height);
@@ -175,6 +178,7 @@ result cuda(int type, uint32_t width, uint32_t height, uint32_t *data, uint8_t a
       break;
   }
 
+  // Measure execution time
   CUDA_CHECK(cudaEventRecord(stop));
   CUDA_CHECK(cudaEventSynchronize(stop));
   float runtime = 0;

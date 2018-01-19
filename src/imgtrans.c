@@ -125,7 +125,7 @@ int main(int argc, char **argv) {
   }
 
   // Write image to disk with PNG compression
-  vector<int> compression_params;
+  std::vector<int> compression_params;
   compression_params.push_back(CV_IMWRITE_PNG_COMPRESSION);
   compression_params.push_back(9);
 

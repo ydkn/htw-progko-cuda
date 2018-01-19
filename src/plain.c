@@ -11,9 +11,9 @@
 #pragma mark Swap Green/Blue
 
 result swap(cv::Mat *image, uint32_t width, uint32_t height, uint32_t *data) {
-  for (int i = 0; i < height; i++) {
-    for (int j = 0; j < width; j++) {
-      int index = (i * width) + j;
+  for (uint32_t i = 0; i < height; i++) {
+    for (uint32_t j = 0; j < width; j++) {
+      uint32_t index = (i * width) + j;
 
       data[index] = RGBA(RED(data[index]), BLUE(data[index]), GREEN(data[index]), ALPHA(data[index]));
     }
@@ -30,9 +30,9 @@ result swap(cv::Mat *image, uint32_t width, uint32_t height, uint32_t *data) {
 #pragma mark Grayscale
 
 result gray(cv::Mat *image, uint32_t width, uint32_t height, uint32_t *data) {
-  for (int i = 0; i < height; i++) {
-    for (int j = 0; j < width; j++) {
-      int idx = (i * width) + j;
+  for (uint32_t i = 0; i < height; i++) {
+    for (uint32_t j = 0; j < width; j++) {
+      uint32_t idx = (i * width) + j;
 
       uint8_t gray = (0.21 * RED(data[idx])) + (0.72 * GREEN(data[idx])) + (0.07 * BLUE(data[idx]));
 
@@ -51,6 +51,8 @@ result gray(cv::Mat *image, uint32_t width, uint32_t height, uint32_t *data) {
 #pragma mark Blur
 
 result blur(cv::Mat *image, uint32_t width, uint32_t height, uint32_t *data, uint8_t area) {
+  // Not implemented
+
   struct result res;
   res.code    = RES_ARRAY;
   res.runtime = 0;
@@ -62,6 +64,8 @@ result blur(cv::Mat *image, uint32_t width, uint32_t height, uint32_t *data, uin
 #pragma mark Emboss
 
 result emboss(cv::Mat *image, uint32_t width, uint32_t height, uint32_t *data) {
+  // Not implemented
+
   struct result res;
   res.code    = RES_ARRAY;
   res.runtime = -1;

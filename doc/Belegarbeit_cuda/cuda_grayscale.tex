@@ -95,8 +95,8 @@ uint32_t *image = (uint32_t *) malloc((raw_image.rows * raw_image.cols) * sizeof
 
 for (int i = 0; i < raw_image.rows; i++) {
   for (int j = 0; j < raw_image.cols; j++) {
-    int raw_index = (i * raw_image.cols + j) * 4;
-    int index     = (i * raw_image.cols) + j;
+    uint32_t raw_index = (i * raw_image.cols + j) * 4;
+    uint32_t index     = (i * raw_image.cols) + j;
 
     // construct single integer value representing all 4 color channels
     image[index] = RGBA(raw_image.data[raw_index + 0], raw_image.data[raw_index + 1], raw_image.data[raw_index + 2], raw_image.data[raw_index + 3]);
@@ -139,21 +139,20 @@ Der Aufruf des Kernels erfolgt mit Angabe des Grids, den Parametern für Blöcke
 kernel_gray<<<blocks, threads>>>(dev_in, dev_out, width, height);
 \end{lstlisting}
 
-
+\newpage
 %
 \subsection{Parallele Konvertierung der Matrix zu luminosity grau}
 %
 
 Auf den aktuelle Blockindex kann innerhalb jedes Threads des Kernels per $blockIdx.x$ und $blockIdx.y$ zugegriffen werden.\\
-\newpage
 Die Grauwertumwandlung erfolgt hierbei durch Addition der Gewichtungen der einzelnen Farbkanäle. 
 
 \begin{lstlisting}
 __global__ void kernel_gray(uint32_t *in, uint32_t *out, uint32_t w, uint32_t h) {
-  int idx = blockIdx.y * w + blockIdx.x;
+  uint32_t idx = (blockIdx.y * blockDim.y + threadIdx.y) * w + (blockIdx.x * blockDim.x) + threadIdx.x;
 
   // Check if thread index is no longer within input array
-  if (ARRAY_LENGTH(in) >= idx) { return; }
+  if ((w * h) <= idx) { return; }
 
   uint8_t gray = (0.21 * RED(in[idx])) + (0.72 * GREEN(in[idx])) + (0.07 * BLUE(in[idx]));
 
@@ -169,23 +168,19 @@ Bei der Transformation per Emboss wird neben der aktuellen Position auch das jew
 
 \begin{lstlisting}
 __global__ void kernel_emboss(uint32_t *in, uint32_t *out, uint32_t w, uint32_t h) {
-  if (blockIdx.y < 1 || blockIdx.x < 1) { return; }
+  // ...
+  
+  uint32_t idx     = (blockIdx.y * blockDim.y + threadIdx.y) * w + (blockIdx.x * blockDim.x) + threadIdx.x;
+  uint32_t idx_ref = (blockIdx.y * blockDim.y + threadIdx.y - 1) * w + (blockIdx.x * blockDim.x) + threadIdx.x - 1;
 
-  int idx     = blockIdx.y * w + blockIdx.x;
-  int idx_ref = (blockIdx.y - 1) * w + (blockIdx.x - 1);
-
-  // Check if thread index is no longer within input array
-  if (ARRAY_LENGTH(in) >= idx) { return; }
-  if (ARRAY_LENGTH(in) >= idx_ref) { return; }
+  // ...
 
   int diffs[] = {
     (RED(in[idx_ref]) - RED(in[idx])),
     (GREEN(in[idx_ref]) - GREEN(in[idx])),
     (BLUE(in[idx_ref]) - BLUE(in[idx]))
   };
-\end{lstlisting}
-\newpage
-\begin{lstlisting}
+
   int diff = diffs[0];
   if ((diffs[1] < 0 ? diffs[1] * -1 : diffs[1]) > diff) { diff = diffs[1]; }
   if ((diffs[2] < 0 ? diffs[2] * -1 : diffs[2]) > diff) { diff = diffs[2]; }
@@ -196,7 +191,6 @@ __global__ void kernel_emboss(uint32_t *in, uint32_t *out, uint32_t w, uint32_t 
 
   out[idx] = RGBA(gray, gray, gray, ALPHA(in[idx]));
 }
-}
 \end{lstlisting}
 %
 \subsection{Parallele Konvertierung der Matrix per Blur}
@@ -206,25 +200,14 @@ Bei der Anwendung von Blur wird der umliegende Bereich eines Pixels betrachtet u
 
 \begin{lstlisting}
 __global__ void kernel_blur(uint32_t *in, uint32_t *out, uint32_t w, uint32_t h, uint8_t area) {
-  int idx = blockIdx.y * w + blockIdx.x;
+  // ...
+  uint32_t min_x      = x < area ? 0 : x - area;
+  uint32_t min_y      = y < area ? 0 : y - area;
+  uint32_t max_x      = (x + area) >= w ? w : x + area;
+  uint32_t max_y      = (y + area) >= h ? h : y + area;
+  // ...
 
-  // Check if thread index is no longer within input array
-  if (ARRAY_LENGTH(in) >= idx) { return; }
-
-  uint32_t min_x      = blockIdx.x < area ? 0 : blockIdx.x - area;
-  uint32_t min_y      = blockIdx.y < area ? 0 : blockIdx.y - area;
-  uint32_t max_x      = (blockIdx.x + area) >= w ? w : blockIdx.x + area;
-  uint32_t max_y      = (blockIdx.y + area) >= h ? h : blockIdx.y + area;
-  uint32_t num_pixels = 0;
-  uint32_t red_sum    = 0;
-  uint32_t green_sum  = 0;
-  uint32_t blue_sum   = 0;
-  uint32_t alpha_sum  = 0;
-  uint32_t i          = 0;
-\end{lstlisting}
-\newpage
-\begin{lstlisting}
-
+  // Sum up color values within area
   for(int x = min_x; x < max_x; x += 1) {
     for(int y = min_y; y < max_y; y += 1) {
       i = y * w + x;
@@ -247,10 +230,10 @@ Beim Tausch des blauen und grünen Farbkanals wird der RGBA-Wert neu kodiert, in
 
 \begin{lstlisting}
 __global__ void kernel_swap(uint32_t *in, uint32_t *out, uint32_t w, uint32_t h) {
-  int idx = blockIdx.y * w + blockIdx.x;
+  uint32_t idx = (blockIdx.y * blockDim.y + threadIdx.y) * w + (blockIdx.x * blockDim.x) + threadIdx.x;
 
   // Check if thread index is no longer within input array
-  if (ARRAY_LENGTH(in) >= idx) { return; }
+  if ((w * h) <= idx) { return; }
 
   out[idx] = RGBA(RED(in[idx]), BLUE(in[idx]), GREEN(in[idx]), ALPHA(in[idx]));
 }
@@ -261,7 +244,6 @@ __global__ void kernel_swap(uint32_t *in, uint32_t *out, uint32_t w, uint32_t h)
 \subsection{Verwendung des Ergebnisses der Bildtransformation}
 %
 Das Ergebnis wird vom Speicher des Devices auf den Host kopiert. Anschließend wird der Speicher auf dem Device wieder freigegeben. Weiterhin wird das Device zurückgesetzt, sodass alle Prozesse beendet sind.\\
-\newpage
 \begin{lstlisting}
 // Copy transformed image data from device
 CUDA_CHECK(cudaMemcpy(data, dev_out, buffer_size, cudaMemcpyDeviceToHost));
@@ -272,6 +254,8 @@ CUDA_CHECK(cudaFree(dev_out));
 CUDA_CHECK(cudaDeviceReset());
 \end{lstlisting}
 
+\newpage
+
 %
 \subsection{Erstellen einer PNG-Datei aus der neuen RGBA-Matrix}
 %
@@ -280,15 +264,12 @@ Um die transformierten Daten als Bild zu speichern, werden diese zunächst in ei
 \begin{lstlisting}
 out_image = Mat(raw_image.rows, raw_image.cols, CV_8UC4, image);
 
-// Save output to disk
-imwrite(argv[3], out_image);
-\end{lstlisting}
+// Write image to disk with PNG compression
+std::vector<int> compression_params;
+compression_params.push_back(CV_IMWRITE_PNG_COMPRESSION);
+compression_params.push_back(9);
 
-Abschließend wird der Speicher des Ursprungsbildes freigegeben.
-
-\begin{lstlisting}
-// Cleanup memory
-  free(image);
+imwrite(argv[3], out_image, compression_params);
 \end{lstlisting}
 
 
@@ -303,7 +284,6 @@ Im folgenden Kapitel werden Performance-Vergleiche und -Analysen durchgeführt. 
 %
 
 Um höchstmögliche parallele Verarbeitung zu erreichen, ist es wichtig die passenden Parameter für das Grid zu wählen. Für eine optimale Auslastung wurden 1024 Threads pro Block gewählt und einem Thread pro Block gegenübergestellt.
-\newpage
 Gewählte Parameter für "Optimized":
 \begin{lstlisting}
 dim3 threads(32, 32);
@@ -340,6 +320,18 @@ Abbildung \ref{fig:analysis} beschreibt die Gesamtlaufzeit der unterschiedlichen
 	\caption{Gesamtlaufzeit der drei unterschiedlichen Implementierungen}
 	\label{fig:analysis}
 \end{figure}
+
+Im folgenden ist die OpenCV-Implementierung der Graufstufenkonvertierung dargestellt. Diese Implementierung setzt jedoch im Gegensatz zur CUDA- und CPU-Implementierung voraus, dass das Bild keine Transparenz enthält.
+
+\begin{lstlisting}
+result gray(cv::Mat *image, uint32_t width, uint32_t height, uint32_t *data) {
+  // This does not work with alpha channel images
+  // Only use RGBA images
+  transform(*image, *image, Matx13f(0.07, 0.72, 0.21));
+
+  // ...
+}
+\end{lstlisting}
 
 Um dieses Ergebnis genauer vergleichen zu können, wurde zusätzlich die Laufzeit des Konvertierungsalgorithmus bestimmt. Diese effektiven Laufzeiten unterscheiden sich bei der Implementation ohne Parallelisieren und die Implementierung mit OpenCV nicht von der Gesamtlaufzeit. Bei der CUDA-Implementierung hingegen wird bei der effektiven Laufzeit nur der Aufruf und die Ausführung auf der GPU gemessen. Der Vergleich der effektiven Laufzeit der drei Implementierungen ist in Abbildung \ref{fig:analysis_gpu} dargestellt. Es ist gut zu erkennen, dass die effektive Laufzeit auf der GPU im Vergleich zu den anderen beiden Implementierungen aufgrund der hohen Parallelisierung wesentlich geringer ist.
 
