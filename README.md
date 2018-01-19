@@ -18,8 +18,8 @@ Run:
 ## Usage
 
     $ dist/imgtrans-cuda <swap|gray|blur|emboss> <infile> <outfile> (<area>)
-    $ dist/imgtrans-opencv <swap|gray|blur|emboss> <infile> <outfile> (<area>)
-    $ dist/imgtrans-plain <swap|gray|blur|emboss> <infile> <outfile> (<area>)
+    $ dist/imgtrans-opencv <swap|gray> <infile> <outfile> (<area>)
+    $ dist/imgtrans-plain <swap|gray> <infile> <outfile> (<area>)
 
 * &lt;area&gt; is only used for blur mode.
 
