@@ -40,7 +40,7 @@ RGBA umrechnen\\ zu luminosity grau\\[6pt]
 
 \begin{flushleft}
 \begin{tabular}{ll}
-{\bfseries Vorgelegt am 21.01.2018 durch: }\\
+{\bfseries Vorgelegt am 25.01.2018 durch: }\\
 Florian Schwab, s0562789, s0562789@htw-berlin.de \\
 Elsa Buchholz, s0544180, s0544180@htw-berlin.de \\
 \end{tabular}
@@ -118,27 +118,90 @@ uint32_t *dev_in, *dev_out;
 CUDA_CHECK(cudaMalloc((void **) &dev_in, buffer_size));
 CUDA_CHECK(cudaMalloc((void **) &dev_out, buffer_size));
 \end{lstlisting}
-
-Auf dem Host werden weiterhin die Daten vom Speicher des Hosts in den Speicher des Devices kopiert.\\
+\vspace*{0.5cm}
+Auf dem Host werden weiterhin die Daten vom Speicher des Hosts in den Speicher des Devices kopiert.
 
 \begin{lstlisting}[]
 // Copy image data to device
 CUDA_CHECK(cudaMemcpy(dev_in, data, buffer_size, cudaMemcpyHostToDevice));
 \end{lstlisting}
-
+\vspace*{0.5cm}
 Auf dem Referenz-Host (deepgreen04.f4.htw-berlin.de) gibt es 1024 Threads pro Multiprozessor. Eine Aufteilung in $32 * 32 = 1024$ Threads ist sinnvoll, um einen Multiprozessor maximal auszunutzen. Weiterhin muss die Gesamtgröße des Problems $with * height$ Pixel als einzelner Thread ausgeführt werden. Daher werden $(width * height) / 1024$ Blöcke benötigt. Diese Blöcke werden ebenfalls zweidimensional aufgeilt.
 
 \begin{lstlisting}
 dim3 threads(32, 32);
 dim3 blocks((width / threads.x + 1), (height / threads.y + 1));
 \end{lstlisting}
-
+\vspace*{0.5cm}
 Der Aufruf des Kernels erfolgt mit Angabe des Grids, den Parametern für Blöcke und Threads.
 
 \begin{lstlisting}
 kernel_gray<<<blocks, threads>>>(dev_in, dev_out, width, height);
 \end{lstlisting}
 
+\newpage
+\subsection{Parallele Konvertierung der Matrix per Emboss}
+%
+
+Bei der Transformation per Emboss wird neben der aktuellen Position auch das jeweils links darüber liegende Pixel betrachtet. Verallgemeinernd formuliert, wird dabei eine Differenz zwischen den einzelnen Kanälen bestimmt, um Kanten hervorzuheben.
+
+\begin{lstlisting}
+__global__ void kernel_emboss(uint32_t *in, uint32_t *out, uint32_t w, uint32_t h) {
+// ...
+
+uint32_t idx     = (blockIdx.y * blockDim.y + threadIdx.y) * w + (blockIdx.x * blockDim.x) + threadIdx.x;
+uint32_t idx_ref = (blockIdx.y * blockDim.y + threadIdx.y - 1) * w + (blockIdx.x * blockDim.x) + threadIdx.x - 1;
+
+// ...
+
+int diffs[] = {
+(RED(in[idx_ref]) - RED(in[idx])),
+(GREEN(in[idx_ref]) - GREEN(in[idx])),
+(BLUE(in[idx_ref]) - BLUE(in[idx]))
+};
+
+int diff = diffs[0];
+if ((diffs[1] < 0 ? diffs[1] * -1 : diffs[1]) > diff) { diff = diffs[1]; }
+if ((diffs[2] < 0 ? diffs[2] * -1 : diffs[2]) > diff) { diff = diffs[2]; }
+
+int gray = 128 + diff;
+if (gray > 255) { gray = 255; }
+if (gray < 0) { gray = 0; }
+
+out[idx] = RGBA(gray, gray, gray, ALPHA(in[idx]));
+}
+\end{lstlisting}
+\newpage
+%
+\subsection{Parallele Konvertierung der Matrix per Blur}
+%
+Bei der Anwendung von Blur wird der umliegende Bereich eines Pixels betrachtet und der Durchschnittswert dieses Bereichs gebildet.
+
+\begin{lstlisting}
+__global__ void kernel_blur(uint32_t *in, uint32_t *out, uint32_t w, uint32_t h, uint8_t area) {
+// ...
+uint32_t min_x      = x < area ? 0 : x - area;
+uint32_t min_y      = y < area ? 0 : y - area;
+uint32_t max_x      = (x + area) >= w ? w : x + area;
+uint32_t max_y      = (y + area) >= h ? h : y + area;
+// ...
+
+// Sum up color values within area
+for(int x = min_x; x < max_x; x += 1) {
+for(int y = min_y; y < max_y; y += 1) {
+i = y * w + x;
+
+num_pixels += 1;
+red_sum    += RED(in[i]);
+green_sum  += GREEN(in[i]);
+blue_sum   += BLUE(in[i]);
+alpha_sum  += ALPHA(in[i]);
+}
+}
+
+out[idx] = RGBA((red_sum / num_pixels), (green_sum / num_pixels), (blue_sum / num_pixels), (alpha_sum / num_pixels));
+}
+\end{lstlisting}
 \newpage
 %
 \subsection{Parallele Konvertierung der Matrix zu luminosity grau}
@@ -161,69 +224,6 @@ __global__ void kernel_gray(uint32_t *in, uint32_t *out, uint32_t w, uint32_t h)
 \end{lstlisting}
 
 %
-\subsection{Parallele Konvertierung der Matrix per Emboss}
-%
-
-Bei der Transformation per Emboss wird neben der aktuellen Position auch das jeweils links darüber liegende Pixel betrachtet. Verallgemeinernd formuliert, wird dabei eine Differenz zwischen den einzelnen Kanälen bestimmt, um Kanten hervorzuheben.
-
-\begin{lstlisting}
-__global__ void kernel_emboss(uint32_t *in, uint32_t *out, uint32_t w, uint32_t h) {
-  // ...
-  
-  uint32_t idx     = (blockIdx.y * blockDim.y + threadIdx.y) * w + (blockIdx.x * blockDim.x) + threadIdx.x;
-  uint32_t idx_ref = (blockIdx.y * blockDim.y + threadIdx.y - 1) * w + (blockIdx.x * blockDim.x) + threadIdx.x - 1;
-
-  // ...
-
-  int diffs[] = {
-    (RED(in[idx_ref]) - RED(in[idx])),
-    (GREEN(in[idx_ref]) - GREEN(in[idx])),
-    (BLUE(in[idx_ref]) - BLUE(in[idx]))
-  };
-
-  int diff = diffs[0];
-  if ((diffs[1] < 0 ? diffs[1] * -1 : diffs[1]) > diff) { diff = diffs[1]; }
-  if ((diffs[2] < 0 ? diffs[2] * -1 : diffs[2]) > diff) { diff = diffs[2]; }
-
-  int gray = 128 + diff;
-  if (gray > 255) { gray = 255; }
-  if (gray < 0) { gray = 0; }
-
-  out[idx] = RGBA(gray, gray, gray, ALPHA(in[idx]));
-}
-\end{lstlisting}
-%
-\subsection{Parallele Konvertierung der Matrix per Blur}
-%
-Bei der Anwendung von Blur wird der umliegende Bereich eines Pixels betrachtet und der Durchschnittswert dieses Bereichs gebildet.
-
-
-\begin{lstlisting}
-__global__ void kernel_blur(uint32_t *in, uint32_t *out, uint32_t w, uint32_t h, uint8_t area) {
-  // ...
-  uint32_t min_x      = x < area ? 0 : x - area;
-  uint32_t min_y      = y < area ? 0 : y - area;
-  uint32_t max_x      = (x + area) >= w ? w : x + area;
-  uint32_t max_y      = (y + area) >= h ? h : y + area;
-  // ...
-
-  // Sum up color values within area
-  for(int x = min_x; x < max_x; x += 1) {
-    for(int y = min_y; y < max_y; y += 1) {
-      i = y * w + x;
-
-      num_pixels += 1;
-      red_sum    += RED(in[i]);
-      green_sum  += GREEN(in[i]);
-      blue_sum   += BLUE(in[i]);
-      alpha_sum  += ALPHA(in[i]);
-    }
-  }
-
-  out[idx] = RGBA((red_sum / num_pixels), (green_sum / num_pixels), (blue_sum / num_pixels), (alpha_sum / num_pixels));
-}
-\end{lstlisting}
-%
 \subsection{Parallele Konvertierung der Matrix mit Austausch der blauen und grünen Komponenten}
 %
 Beim Tausch des blauen und grünen Farbkanals wird der RGBA-Wert neu kodiert, indem der blaue mit dem grünen Farbkanal getauscht wird.
@@ -239,11 +239,11 @@ __global__ void kernel_swap(uint32_t *in, uint32_t *out, uint32_t w, uint32_t h)
 }
 \end{lstlisting}
 
-
+\newpage
 %
 \subsection{Verwendung des Ergebnisses der Bildtransformation}
 %
-Das Ergebnis wird vom Speicher des Devices auf den Host kopiert. Anschließend wird der Speicher auf dem Device wieder freigegeben. Weiterhin wird das Device zurückgesetzt, sodass alle Prozesse beendet sind.\\
+Das Ergebnis wird vom Speicher des Devices auf den Host kopiert. Anschließend wird der Speicher auf dem Device wieder freigegeben. Weiterhin wird das Device zurückgesetzt, sodass alle Prozesse beendet sind.
 \begin{lstlisting}
 // Copy transformed image data from device
 CUDA_CHECK(cudaMemcpy(data, dev_out, buffer_size, cudaMemcpyDeviceToHost));
@@ -253,8 +253,6 @@ CUDA_CHECK(cudaFree(dev_out));
 // Terminate CUDA device usage
 CUDA_CHECK(cudaDeviceReset());
 \end{lstlisting}
-
-\newpage
 
 %
 \subsection{Erstellen einer PNG-Datei aus der neuen RGBA-Matrix}
@@ -278,24 +276,27 @@ imwrite(argv[3], out_image, compression_params);
 %
 
 Im folgenden Kapitel werden Performance-Vergleiche und -Analysen durchgeführt. Die Analyse bezieht sich auf die optimale Ausnutzung der vorhandenen Ressourcen auf dem Referenzhost deepgreen04. Durch einen Performance-Vergleich werden parallele Frameworks und das sequenzielle Abarbeiten des Problems betrachtet.  Verwendet wurden quadratische Bilder, die iterativ von einer Größe von 50x50 bis 5000x5000 erzeugt wurden. In den Diagrammen ist die Größe für eine Dimension angeben.
+\newpage
 
 %
 \subsection{Auswahl der Grid-Parameter}
 %
 
-Um höchstmögliche parallele Verarbeitung zu erreichen, ist es wichtig die passenden Parameter für das Grid zu wählen. Für eine optimale Auslastung wurden 1024 Threads pro Block gewählt und einem Thread pro Block gegenübergestellt.
-Gewählte Parameter für "Optimized":
+Um höchstmögliche parallele Verarbeitung zu erreichen, ist es wichtig die passenden Parameter für das Grid zu wählen. Für eine optimale Auslastung wurden 1024 Threads pro Block gewählt und einem Thread pro Block gegenübergestellt.\\
+
+Gewählte Parameter für \glqq Optimized\grqq{}:
 \begin{lstlisting}
 dim3 threads(32, 32);
 dim3 blocks((width / threads.x + 1), (height / threads.y + 1));
 \end{lstlisting}
+\vspace{0.5cm}
 
-Gewählte Parameter für "Static":
+Gewählte Parameter für \glqq Static\grqq{}:
 \begin{lstlisting}
 dim3 threads(1);
 dim3 blocks(width, height);
 \end{lstlisting}
-
+\vspace*{0.5cm}
 Abbildung \ref{fig:analysis_grids} zeigt, dass sich je nach Bildgröße eine Verschlechterung der Laufzeit ergibt. Eine Verschlechterung um über 3000 \% ergibt sich bei einer Bildgröße von 5000x5000, wenn anstatt 1024 Threads nur ein Thread pro Block gewählt wird.
 
 \begin{figure}
@@ -304,13 +305,25 @@ Abbildung \ref{fig:analysis_grids} zeigt, dass sich je nach Bildgröße eine Ver
 	\caption{Vergleich unterschiedlicher Grid-Parameter}
 	\label{fig:analysis_grids}
 \end{figure}
-
-
+\newpage
 %
 \subsection{Umwandlung ohne Parallelisierung, mit OpenCV und auf der GPU mit CUDA}
 %
 
-Um äußere Einflüsse auf die Laufzeitmessungen möglichst klein zu halten, wurden die Messungen 10-mal durchgeführt und die Durchschnittswerte der einzelnen Messwerte pro Implementierung verwendet.\\
+Um äußere Einflüsse auf die Laufzeitmessungen möglichst klein zu halten, wurden die Messungen zehnmal durchgeführt und die Durchschnittswerte der einzelnen Messwerte pro Implementierung verwendet.\\
+
+Im folgenden ist die OpenCV-Implementierung der Graufstufenkonvertierung dargestellt. Diese Implementierung setzt jedoch im Gegensatz zur CUDA- und CPU-Implementierung voraus, dass das Bild keine Transparenz enthält.
+
+\begin{lstlisting}
+result gray(cv::Mat *image, uint32_t width, uint32_t height, uint32_t *data) {
+// This does not work with alpha channel images
+// Only use RGBA images
+transform(*image, *image, Matx13f(0.07, 0.72, 0.21));
+
+// ...
+}
+\end{lstlisting}
+\vspace*{0.5cm}
 
 Abbildung \ref{fig:analysis} beschreibt die Gesamtlaufzeit der unterschiedlichen Implementierungen. Die Gesamtlaufzeit enthält im Falle von CUDA das Reservieren des GPU-Speichers, das Kopieren der Daten vom Host zum Device, das Kopieren des Ergebnisses vom Device auf den Host, das Freigeben des GPU-Speichers und das Zurücksetzen des Devices. Aus Abbildung \ref{fig:analysis} ist ersichtlich, dass die Gesamtlaufzeit von der CUDA-Implementierung mit ca. 1,1 Sekunden weit über den Laufzeiten der beiden anderen Implementierungen liegt.
 
@@ -320,18 +333,6 @@ Abbildung \ref{fig:analysis} beschreibt die Gesamtlaufzeit der unterschiedlichen
 	\caption{Gesamtlaufzeit der drei unterschiedlichen Implementierungen}
 	\label{fig:analysis}
 \end{figure}
-
-Im folgenden ist die OpenCV-Implementierung der Graufstufenkonvertierung dargestellt. Diese Implementierung setzt jedoch im Gegensatz zur CUDA- und CPU-Implementierung voraus, dass das Bild keine Transparenz enthält.
-
-\begin{lstlisting}
-result gray(cv::Mat *image, uint32_t width, uint32_t height, uint32_t *data) {
-  // This does not work with alpha channel images
-  // Only use RGBA images
-  transform(*image, *image, Matx13f(0.07, 0.72, 0.21));
-
-  // ...
-}
-\end{lstlisting}
 
 Um dieses Ergebnis genauer vergleichen zu können, wurde zusätzlich die Laufzeit des Konvertierungsalgorithmus bestimmt. Diese effektiven Laufzeiten unterscheiden sich bei der Implementation ohne Parallelisieren und die Implementierung mit OpenCV nicht von der Gesamtlaufzeit. Bei der CUDA-Implementierung hingegen wird bei der effektiven Laufzeit nur der Aufruf und die Ausführung auf der GPU gemessen. Der Vergleich der effektiven Laufzeit der drei Implementierungen ist in Abbildung \ref{fig:analysis_gpu} dargestellt. Es ist gut zu erkennen, dass die effektive Laufzeit auf der GPU im Vergleich zu den anderen beiden Implementierungen aufgrund der hohen Parallelisierung wesentlich geringer ist.
 
@@ -350,14 +351,9 @@ Um einen besseren direkten Vergleich zwischen den Implementierungen mit OpenCV u
 	\caption{Vergleich der effektiven Laufzeit zwischen CUDA und OpenCV}
 	\label{fig:analysis_no_plain}
 \end{figure}
-
 %
 \section{Fazit}
 %
-
-Aus den Performanceuntersuchungen geht hervor, dass der Overhead bei der Verwendung von CUDA nicht zu vernachlässigen ist. Die Verwendung von CUDA eignet sich daher nicht bei kleinen Problemen. Der in der Untersuchung feststellbare Overhead lag bei ca. 1,1 Sekunden. Eine Verwendung eignet sich aufgrund dieser Ergebnisse erst, wenn das zu lösende Problem nicht in weniger als einer Sekunde zu lösen ist.\\
-
-Grundsätzlich ist die Parallelisierung eines Problems ratsam, um die Gesamtlaufzeit möglichst kurz halten.
-Es ist von Vorteil, die Auswahl des verwendeten Grids an die Ressourcen des verwendeten Hosts anzupassen. Damit kann eine optimale Ausnutzung der Performance in Bezug auf die Laufzeit erreicht werden.
+Wird die Laufzeit des Konvertierungsalgorithmus betrachtet, kann festgestellt werden, dass die Parallelisierung der Bildverarbeitung mit CUDA einen Performancegewinn gegenüber der Verarbeitung ohne Parallelisierung besitzt. OpenCV als weiteres Framework zur Parallelisierung von Algorithmen zeigt einen vergleichbaren Performancegewinn. CUDA ist im Vergleich zu OpenCV performanter. Der Programmieraufwand von CUDA ist durch das Kopieren der Daten zwischen Host und Device hoch, was sich durch den Performancegewinn über die Parallelisierung relativiert. Aus den Performanceuntersuchungen geht hervor, dass der Overhead bei der Verwendung von CUDA nicht zu vernachlässigen ist. Die Verwendung von CUDA eignet sich daher nicht bei kleinen Problemen. Der in der Untersuchung feststellbare Overhead lag bei ca. 1,1 Sekunden. Eine Verwendung eignet sich aufgrund dieser Ergebnisse erst, wenn das zu lösende Problem nicht in weniger als einer Sekunde zu lösen ist. Grundsätzlich ist die Parallelisierung eines Problems ratsam, um die Gesamtlaufzeit möglichst kurz halten. Es ist von Vorteil, die Auswahl des verwendeten Grids an die Ressourcen des verwendeten Hosts anzupassen. Damit kann eine optimale Ausnutzung der Performance in Bezug auf die Laufzeit erreicht werden.\\
 %
 \end{document}
